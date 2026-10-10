@@ -43,6 +43,9 @@ public class MarketplaceIntegrationTest {
     private CategoryRepository categoryRepository;
 
     @Autowired
+    private com.campushub.modules.marketplace.repository.ProductRepository productRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     private Category testCategory;
@@ -168,24 +171,269 @@ public class MarketplaceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isEmpty());
                 
-        // Public detail should return 404 for HIDDEN
+        // Owner should still be able to see their own HIDDEN product
         mockMvc.perform(get("/api/v1/products/" + productId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Updated Title"));
+    }
+
+    @Test
+    public void testAnonymousCannotViewHiddenProduct() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Hidden Item");
+        p.setPrice(new BigDecimal("50"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser);
+        p.setStatus(ProductStatus.HIDDEN);
+        p = productRepository.save(p);
+
+        mockMvc.perform(get("/api/v1/products/" + p.getId()))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     @WithMockUser(username = "seller2")
     public void testUnauthorizedUpdate() throws Exception {
-        // Assume Seller 1 created a product, Seller 2 tries to update it
-        // We simulate by creating a product as Seller 2 first (since we can't easily switch mock user in middle of test method without custom runner)
-        // Wait, if I create as Seller 2, then Seller 1 tries to update, I need two tests or change context.
-        // Let's just create it directly in DB for Seller 1.
         com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
         p.setTitle("Seller 1 Item");
         p.setPrice(new BigDecimal("50"));
         p.setCategory(testCategory);
         p.setOwner(testUser); // Seller 1
         p.setStatus(ProductStatus.ACTIVE);
-        // Save using repository? I don't have it autowired here. Let's just assume we can't easily test without injecting ProductRepository.
+        p = productRepository.save(p);
+
+        ProductUpdateRequest updateReq = new ProductUpdateRequest();
+        updateReq.setTitle("Hacked Title");
+        updateReq.setPrice(new BigDecimal("10"));
+        updateReq.setCategoryId(testCategory.getId());
+        updateReq.setVersion(p.getVersion());
+
+        mockMvc.perform(put("/api/v1/products/" + p.getId()).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "seller1")
+    public void testConcurrentUpdate_RejectsStaleVersionAndPreservesDatabaseState() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Concurrent Item");
+        p.setPrice(new BigDecimal("50.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser);
+        p.setStatus(ProductStatus.ACTIVE);
+        p = productRepository.saveAndFlush(p);
+
+        Long initialVersion = p.getVersion();
+
+        ProductUpdateRequest updateReq = new ProductUpdateRequest();
+        updateReq.setTitle("Overwritten Title");
+        updateReq.setPrice(new BigDecimal("99.99"));
+        updateReq.setCategoryId(testCategory.getId());
+        updateReq.setVersion(initialVersion - 1); // Pass stale/invalid version
+
+        mockMvc.perform(put("/api/v1/products/" + p.getId()).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONCURRENT_UPDATE"));
+
+        // Verify database state: actual data was NOT silently overwritten and version remains unchanged
+        com.campushub.modules.marketplace.entity.Product actualProduct = productRepository.findById(p.getId()).orElseThrow();
+        assertEquals("Concurrent Item", actualProduct.getTitle());
+        assertEquals(0, new BigDecimal("50.00").compareTo(actualProduct.getPrice()));
+        assertEquals(initialVersion, actualProduct.getVersion());
+    }
+
+    @Test
+    @WithMockUser(username = "seller1")
+    public void testConcurrentStatusUpdate_RejectsStaleVersionAndPreservesDatabaseState() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Status Item");
+        p.setPrice(new BigDecimal("70.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser);
+        p.setStatus(ProductStatus.ACTIVE);
+        p = productRepository.saveAndFlush(p);
+
+        ProductStatusUpdateRequest statusReq = new ProductStatusUpdateRequest();
+        statusReq.setStatus(ProductStatus.HIDDEN);
+        statusReq.setVersion(p.getVersion() - 1); // Stale version
+
+        mockMvc.perform(patch("/api/v1/products/" + p.getId() + "/status").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(statusReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONCURRENT_UPDATE"));
+
+        com.campushub.modules.marketplace.entity.Product actualProduct = productRepository.findById(p.getId()).orElseThrow();
+        assertEquals(ProductStatus.ACTIVE, actualProduct.getStatus());
+        assertEquals(p.getVersion(), actualProduct.getVersion());
+    }
+
+    // --- Product Detail Authorization Matrix (9 Permutations) ---
+
+    // 1. Anonymous + ACTIVE -> 200 OK
+    @Test
+    public void testDetail_Anonymous_Active() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Anon Active Product");
+        p.setPrice(new BigDecimal("10.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser);
+        p.setStatus(ProductStatus.ACTIVE);
+        p = productRepository.saveAndFlush(p);
+
+        mockMvc.perform(get("/api/v1/products/" + p.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Anon Active Product"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.owner.username").value("seller1"));
+    }
+
+    // 2. Anonymous + HIDDEN -> 404
+    @Test
+    public void testDetail_Anonymous_Hidden() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Anon Hidden Product");
+        p.setPrice(new BigDecimal("10.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser);
+        p.setStatus(ProductStatus.HIDDEN);
+        p = productRepository.saveAndFlush(p);
+
+        mockMvc.perform(get("/api/v1/products/" + p.getId()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("PRODUCT_NOT_FOUND"));
+    }
+
+    // 3. Anonymous + SOLD -> 404
+    @Test
+    public void testDetail_Anonymous_Sold() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Anon Sold Product");
+        p.setPrice(new BigDecimal("10.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser);
+        p.setStatus(ProductStatus.SOLD);
+        p = productRepository.saveAndFlush(p);
+
+        mockMvc.perform(get("/api/v1/products/" + p.getId()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("PRODUCT_NOT_FOUND"));
+    }
+
+    // 4. Authenticated Owner + ACTIVE -> 200 OK
+    @Test
+    @WithMockUser(username = "seller1")
+    public void testDetail_Owner_Active() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Owner Active Product");
+        p.setPrice(new BigDecimal("10.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser);
+        p.setStatus(ProductStatus.ACTIVE);
+        p = productRepository.saveAndFlush(p);
+
+        mockMvc.perform(get("/api/v1/products/" + p.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Owner Active Product"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    // 5. Authenticated Owner + HIDDEN -> 200 OK
+    @Test
+    @WithMockUser(username = "seller1")
+    public void testDetail_Owner_Hidden() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Owner Hidden Product");
+        p.setPrice(new BigDecimal("10.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser);
+        p.setStatus(ProductStatus.HIDDEN);
+        p = productRepository.saveAndFlush(p);
+
+        mockMvc.perform(get("/api/v1/products/" + p.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Owner Hidden Product"))
+                .andExpect(jsonPath("$.status").value("HIDDEN"));
+    }
+
+    // 6. Authenticated Owner + SOLD -> 200 OK
+    @Test
+    @WithMockUser(username = "seller1")
+    public void testDetail_Owner_Sold() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Owner Sold Product");
+        p.setPrice(new BigDecimal("10.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser);
+        p.setStatus(ProductStatus.SOLD);
+        p = productRepository.saveAndFlush(p);
+
+        mockMvc.perform(get("/api/v1/products/" + p.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Owner Sold Product"))
+                .andExpect(jsonPath("$.status").value("SOLD"));
+    }
+
+    // 7. Other User + HIDDEN -> 404
+    @Test
+    @WithMockUser(username = "seller2")
+    public void testDetail_OtherUser_Hidden() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Seller 1 Hidden Product");
+        p.setPrice(new BigDecimal("10.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser); // Owned by seller1
+        p.setStatus(ProductStatus.HIDDEN);
+        p = productRepository.saveAndFlush(p);
+
+        mockMvc.perform(get("/api/v1/products/" + p.getId()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("PRODUCT_NOT_FOUND"));
+    }
+
+    // 8. Other User + SOLD -> 404
+    @Test
+    @WithMockUser(username = "seller2")
+    public void testDetail_OtherUser_Sold() throws Exception {
+        com.campushub.modules.marketplace.entity.Product p = new com.campushub.modules.marketplace.entity.Product();
+        p.setTitle("Seller 1 Sold Product");
+        p.setPrice(new BigDecimal("10.00"));
+        p.setCategory(testCategory);
+        p.setOwner(testUser); // Owned by seller1
+        p.setStatus(ProductStatus.SOLD);
+        p = productRepository.saveAndFlush(p);
+
+        mockMvc.perform(get("/api/v1/products/" + p.getId()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("PRODUCT_NOT_FOUND"));
+    }
+
+    // 9. Non-existent Product -> 404
+    @Test
+    public void testDetail_ProductNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/products/9999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("PRODUCT_NOT_FOUND"));
+    }
+
+    // Validation: Description > 2000 chars -> 400 Bad Request
+    @Test
+    @WithMockUser(username = "seller1")
+    public void testCreateProduct_DescriptionTooLong_ReturnsBadRequest() throws Exception {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setTitle("Valid Title");
+        req.setPrice(new BigDecimal("50.00"));
+        req.setCategoryId(testCategory.getId());
+        req.setDescription("A".repeat(2001));
+
+        mockMvc.perform(post("/api/v1/products").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.description").exists());
     }
 }

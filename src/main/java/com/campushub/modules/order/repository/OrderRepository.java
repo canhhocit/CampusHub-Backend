@@ -1,0 +1,32 @@
+package com.campushub.modules.order.repository;
+
+import com.campushub.modules.order.entity.Order;
+import com.campushub.modules.order.entity.OrderStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.Collection;
+import java.util.Optional;
+
+@Repository
+public interface OrderRepository extends JpaRepository<Order, Long> {
+
+    Optional<Order> findByOrderNumber(String orderNumber);
+
+    Page<Order> findByBuyerId(Long buyerId, Pageable pageable);
+
+    Page<Order> findBySellerId(Long sellerId, Pageable pageable);
+
+    @Query("SELECT COUNT(o) > 0 FROM Order o WHERE o.product.id = :productId AND o.status IN :statuses")
+    boolean existsByProductIdAndStatusIn(@Param("productId") Long productId, @Param("statuses") Collection<OrderStatus> statuses);
+
+    @Query("SELECT o FROM Order o WHERE o.product.id = :productId AND o.status IN :statuses")
+    Optional<Order> findFirstByProductIdAndStatusIn(@Param("productId") Long productId, @Param("statuses") Collection<OrderStatus> statuses);
+
+    @Query("SELECT COUNT(o) > 0 FROM Order o WHERE o.compartment.id = :compartmentId AND o.status IN :statuses")
+    boolean existsByCompartmentIdAndStatusIn(@Param("compartmentId") Long compartmentId, @Param("statuses") Collection<OrderStatus> statuses);
+}

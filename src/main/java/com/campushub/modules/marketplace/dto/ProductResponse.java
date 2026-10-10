@@ -20,6 +20,7 @@ public class ProductResponse {
 
     public static class OwnerResponse {
         private Long id;
+        private String username;
         private String fullName;
 
         public OwnerResponse(Long id, String fullName) {
@@ -27,7 +28,14 @@ public class ProductResponse {
             this.fullName = fullName;
         }
 
+        public OwnerResponse(Long id, String username, String fullName) {
+            this.id = id;
+            this.username = username;
+            this.fullName = fullName;
+        }
+
         public Long getId() { return id; }
+        public String getUsername() { return username; }
         public String getFullName() { return fullName; }
     }
 

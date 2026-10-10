@@ -49,8 +49,12 @@ public class MarketplaceController {
     }
 
     @GetMapping("/products/{id}")
-    public ResponseEntity<ProductResponse> getProduct(@PathVariable Long id) {
-        return ResponseEntity.ok(marketplaceService.getPublicProduct(id));
+    public ResponseEntity<ProductResponse> getProduct(@PathVariable Long id, Authentication authentication) {
+        String username = (authentication != null && authentication.isAuthenticated() 
+                && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken))
+                ? authentication.getName() 
+                : null;
+        return ResponseEntity.ok(marketplaceService.getPublicProduct(id, username));
     }
 
     @GetMapping("/products/me")

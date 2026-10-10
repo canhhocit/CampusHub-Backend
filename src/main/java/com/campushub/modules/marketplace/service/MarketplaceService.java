@@ -46,7 +46,7 @@ public class MarketplaceService {
         res.setImageUrl(product.getImageUrl());
         res.setStatus(product.getStatus());
         res.setCategory(mapCategory(product.getCategory()));
-        res.setOwner(new ProductResponse.OwnerResponse(product.getOwner().getId(), product.getOwner().getFullName()));
+        res.setOwner(new ProductResponse.OwnerResponse(product.getOwner().getId(), product.getOwner().getUsername(), product.getOwner().getFullName()));
         res.setCreatedAt(product.getCreatedAt());
         res.setUpdatedAt(product.getUpdatedAt());
         res.setVersion(product.getVersion());
@@ -67,9 +67,15 @@ public class MarketplaceService {
     }
 
     @Transactional(readOnly = true)
-    public ProductResponse getPublicProduct(Long id) {
-        Product product = productRepository.findByIdAndStatus(id, ProductStatus.ACTIVE)
+    public ProductResponse getPublicProduct(Long id, String username) {
+        Product product = productRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            if (username == null || !product.getOwner().getUsername().equals(username)) {
+                throw new AppException(ErrorCode.PRODUCT_NOT_FOUND);
+            }
+        }
         return mapProduct(product);
     }
 
@@ -111,6 +117,10 @@ public class MarketplaceService {
             throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
         }
 
+        if (!product.getVersion().equals(request.getVersion())) {
+            throw new AppException(ErrorCode.CONCURRENT_UPDATE);
+        }
+
         Category category = categoryRepository.findByIdAndIsActiveTrue(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
@@ -119,9 +129,8 @@ public class MarketplaceService {
         product.setPrice(request.getPrice());
         product.setImageUrl(request.getImageUrl());
         product.setCategory(category);
-        product.setVersion(request.getVersion()); // trigger optimistic lock
 
-        product = productRepository.save(product);
+        product = productRepository.saveAndFlush(product);
         return mapProduct(product);
     }
 
@@ -132,6 +141,10 @@ public class MarketplaceService {
 
         if (!product.getOwner().getUsername().equals(username)) {
             throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        if (!product.getVersion().equals(request.getVersion())) {
+            throw new AppException(ErrorCode.CONCURRENT_UPDATE);
         }
 
         ProductStatus current = product.getStatus();
@@ -148,9 +161,8 @@ public class MarketplaceService {
         }
 
         product.setStatus(target);
-        product.setVersion(request.getVersion());
 
-        product = productRepository.save(product);
+        product = productRepository.saveAndFlush(product);
         return mapProduct(product);
     }
 }

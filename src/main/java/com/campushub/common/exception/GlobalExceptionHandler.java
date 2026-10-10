@@ -46,6 +46,18 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.FORBIDDEN);
     }
 
+    @ExceptionHandler({
+        org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+        org.springframework.dao.OptimisticLockingFailureException.class,
+        jakarta.persistence.OptimisticLockException.class
+    })
+    public ResponseEntity<Map<String, String>> handleOptimisticLockingFailure(Exception ex) {
+        Map<String, String> body = new HashMap<>();
+        body.put("error", ErrorCode.CONCURRENT_UPDATE.name());
+        body.put("message", ErrorCode.CONCURRENT_UPDATE.getMessage());
+        return new ResponseEntity<>(body, ErrorCode.CONCURRENT_UPDATE.getStatus());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGlobalException(Exception ex) {
         Map<String, String> body = new HashMap<>();

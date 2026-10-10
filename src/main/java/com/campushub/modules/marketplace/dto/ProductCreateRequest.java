@@ -12,6 +12,7 @@ public class ProductCreateRequest {
     @Size(max = 150)
     private String title;
     
+    @Size(max = 2000)
     private String description;
     
     @NotNull

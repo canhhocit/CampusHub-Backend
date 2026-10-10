@@ -1,0 +1,199 @@
+package com.campushub.modules.order.entity;
+
+import com.campushub.common.model.BaseEntity;
+import com.campushub.modules.locker.entity.Compartment;
+import com.campushub.modules.locker.entity.Locker;
+import com.campushub.modules.marketplace.entity.Product;
+import com.campushub.modules.user.entity.User;
+import jakarta.persistence.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "orders")
+public class Order extends BaseEntity {
+
+    @Column(name = "order_number", nullable = false, unique = true, length = 50)
+    private String orderNumber;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "buyer_id", nullable = false)
+    private User buyer;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "seller_id", nullable = false)
+    private User seller;
+
+    @Column(name = "price_snapshot", nullable = false, precision = 12, scale = 2)
+    private BigDecimal priceSnapshot;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private OrderStatus status = OrderStatus.PENDING_SELLER;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "locker_id")
+    private Locker locker;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "compartment_id")
+    private Compartment compartment;
+
+    @Column(name = "pickup_code_hash")
+    private String pickupCodeHash;
+
+    @Column(name = "pickup_deadline")
+    private LocalDateTime pickupDeadline;
+
+    @Column(name = "pickup_attempts", nullable = false)
+    private Integer pickupAttempts = 0;
+
+    @Column(name = "deposit_at")
+    private LocalDateTime depositAt;
+
+    @Column(name = "picked_up_at")
+    private LocalDateTime pickedUpAt;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version = 0L;
+
+    public String getOrderNumber() {
+        return orderNumber;
+    }
+
+    public void setOrderNumber(String orderNumber) {
+        this.orderNumber = orderNumber;
+    }
+
+    public Product getProduct() {
+        return product;
+    }
+
+    public void setProduct(Product product) {
+        this.product = product;
+    }
+
+    public User getBuyer() {
+        return buyer;
+    }
+
+    public void setBuyer(User buyer) {
+        this.buyer = buyer;
+    }
+
+    public User getSeller() {
+        return seller;
+    }
+
+    public void setSeller(User seller) {
+        this.seller = seller;
+    }
+
+    public BigDecimal getPriceSnapshot() {
+        return priceSnapshot;
+    }
+
+    public void setPriceSnapshot(BigDecimal priceSnapshot) {
+        this.priceSnapshot = priceSnapshot;
+    }
+
+    public OrderStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(OrderStatus status) {
+        this.status = status;
+    }
+
+    public Locker getLocker() {
+        return locker;
+    }
+
+    public void setLocker(Locker locker) {
+        this.locker = locker;
+    }
+
+    public Compartment getCompartment() {
+        return compartment;
+    }
+
+    public void setCompartment(Compartment compartment) {
+        this.compartment = compartment;
+    }
+
+    public String getPickupCodeHash() {
+        return pickupCodeHash;
+    }
+
+    public void setPickupCodeHash(String pickupCodeHash) {
+        this.pickupCodeHash = pickupCodeHash;
+    }
+
+    public LocalDateTime getPickupDeadline() {
+        return pickupDeadline;
+    }
+
+    public void setPickupDeadline(LocalDateTime pickupDeadline) {
+        this.pickupDeadline = pickupDeadline;
+    }
+
+    public Integer getPickupAttempts() {
+        return pickupAttempts;
+    }
+
+    public void setPickupAttempts(Integer pickupAttempts) {
+        this.pickupAttempts = pickupAttempts;
+    }
+
+    public LocalDateTime getDepositAt() {
+        return depositAt;
+    }
+
+    public void setDepositAt(LocalDateTime depositAt) {
+        this.depositAt = depositAt;
+    }
+
+    public LocalDateTime getPickedUpAt() {
+        return pickedUpAt;
+    }
+
+    public void setPickedUpAt(LocalDateTime pickedUpAt) {
+        this.pickedUpAt = pickedUpAt;
+    }
+
+    public LocalDateTime getCancelledAt() {
+        return cancelledAt;
+    }
+
+    public void setCancelledAt(LocalDateTime cancelledAt) {
+        this.cancelledAt = cancelledAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+}
