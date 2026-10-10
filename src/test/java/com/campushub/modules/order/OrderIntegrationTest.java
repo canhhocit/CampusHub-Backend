@@ -418,4 +418,118 @@ public class OrderIntegrationTest {
             assertEquals("INVALID_ORDER_STATUS", e.getMessage());
         }
     }
+
+    @Test
+    public void testFailedPickupPinIncrementsAttemptsAndRejectsAfter5Attempts() throws Exception {
+        Order order = new Order();
+        order.setOrderNumber("ORD-PIN-ATTEMPTS-" + System.currentTimeMillis());
+        order.setProduct(product);
+        order.setBuyer(buyer);
+        order.setSeller(seller);
+        order.setPriceSnapshot(product.getPrice());
+        order.setStatus(OrderStatus.PENDING_SELLER);
+        order = orderRepository.saveAndFlush(order);
+
+        orderService.acceptOrder(order.getId(), null, "seller_order_test");
+        orderService.depositOrder(order.getId(), "seller_order_test");
+
+        OrderPickupRequest wrongReq = new OrderPickupRequest();
+        wrongReq.setPickupCode("000000"); // wrong code
+
+        // 4 failed attempts
+        for (int i = 1; i <= 4; i++) {
+            try {
+                orderService.pickupOrder(order.getId(), wrongReq, "buyer_order_test");
+            } catch (com.campushub.common.exception.AppException e) {
+                assertEquals(com.campushub.common.exception.ErrorCode.INVALID_PICKUP_CODE, e.getErrorCode());
+            }
+            Order current = orderRepository.findById(order.getId()).get();
+            assertEquals(i, current.getPickupAttempts());
+            assertEquals(OrderStatus.READY_FOR_PICKUP, current.getStatus());
+        }
+
+        // 5th failed attempt should trigger PICKUP_ATTEMPTS_EXCEEDED
+        try {
+            orderService.pickupOrder(order.getId(), wrongReq, "buyer_order_test");
+        } catch (com.campushub.common.exception.AppException e) {
+            assertEquals(com.campushub.common.exception.ErrorCode.PICKUP_ATTEMPTS_EXCEEDED, e.getErrorCode());
+        }
+
+        Order finalOrder = orderRepository.findById(order.getId()).get();
+        assertEquals(5, finalOrder.getPickupAttempts());
+        assertEquals(OrderStatus.READY_FOR_PICKUP, finalOrder.getStatus());
+        Compartment comp = compartmentRepository.findById(compartment.getId()).get();
+        assertEquals(CompartmentStatus.OCCUPIED, comp.getStatus());
+    }
+
+    @Test
+    public void testOrderExpirationRetainsOccupiedCompartmentAndAdminClearsIt() throws Exception {
+        Order order = new Order();
+        order.setOrderNumber("ORD-EXPIRE-TEST-" + System.currentTimeMillis());
+        order.setProduct(product);
+        order.setBuyer(buyer);
+        order.setSeller(seller);
+        order.setPriceSnapshot(product.getPrice());
+        order.setStatus(OrderStatus.PENDING_SELLER);
+        order = orderRepository.saveAndFlush(order);
+
+        orderService.acceptOrder(order.getId(), null, "seller_order_test");
+        orderService.depositOrder(order.getId(), "seller_order_test");
+
+        // Set deadline in the past
+        order = orderRepository.findById(order.getId()).get();
+        order.setPickupDeadline(java.time.LocalDateTime.now().minusHours(1));
+        orderRepository.saveAndFlush(order);
+
+        // Run expiration job
+        orderService.checkAndExpireOrders();
+
+        // Verify order is EXPIRED but compartment is still OCCUPIED
+        Order expiredOrder = orderRepository.findById(order.getId()).get();
+        assertEquals(OrderStatus.EXPIRED, expiredOrder.getStatus());
+
+        Compartment comp = compartmentRepository.findById(compartment.getId()).get();
+        assertEquals(CompartmentStatus.OCCUPIED, comp.getStatus());
+
+        Product prod = productRepository.findById(product.getId()).get();
+        assertNotNull(prod.getStatus());
+
+        // Admin clears expired order
+        orderService.adminClearExpiredOrder(order.getId());
+        Order clearedOrder = orderRepository.findById(order.getId()).get();
+        assertNotNull(clearedOrder.getClearedAt());
+
+        Compartment freedComp = compartmentRepository.findById(compartment.getId()).get();
+        assertEquals(CompartmentStatus.AVAILABLE, freedComp.getStatus());
+
+        Product restoredProd = productRepository.findById(product.getId()).get();
+        assertEquals(ProductStatus.HIDDEN, restoredProd.getStatus());
+    }
+
+    @Test
+    public void testAesEncryptionPersistenceAndBuyerOnlyVisibility() throws Exception {
+        Order order = new Order();
+        order.setOrderNumber("ORD-AES-TEST-" + System.currentTimeMillis());
+        order.setProduct(product);
+        order.setBuyer(buyer);
+        order.setSeller(seller);
+        order.setPriceSnapshot(product.getPrice());
+        order.setStatus(OrderStatus.PENDING_SELLER);
+        order = orderRepository.saveAndFlush(order);
+
+        orderService.acceptOrder(order.getId(), null, "seller_order_test");
+        orderService.depositOrder(order.getId(), "seller_order_test");
+
+        Order deposited = orderRepository.findById(order.getId()).get();
+        assertNotNull(deposited.getEncryptedPickupCode());
+
+        // Buyer view order detail: pickupCode is populated
+        var buyerDetail = orderService.getOrder(order.getId(), "buyer_order_test");
+        assertNotNull(buyerDetail.getPickupCode());
+        assertEquals(6, buyerDetail.getPickupCode().length());
+
+        // Seller view order detail: pickupCode is null (hidden from seller)
+        var sellerDetail = orderService.getOrder(order.getId(), "seller_order_test");
+        org.junit.jupiter.api.Assertions.assertNull(sellerDetail.getPickupCode());
+    }
 }

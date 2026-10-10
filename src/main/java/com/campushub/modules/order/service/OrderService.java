@@ -18,6 +18,7 @@ import com.campushub.modules.order.entity.OrderStatus;
 import com.campushub.modules.order.repository.OrderRepository;
 import com.campushub.modules.user.entity.User;
 import com.campushub.modules.user.repository.UserRepository;
+import com.campushub.common.security.AesEncryptionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -47,9 +50,10 @@ public class OrderService {
     private final MockLockerService mockLockerService;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final AesEncryptionService aesEncryptionService;
+    private final OrderAttemptService orderAttemptService;
 
-    // Transient in-memory store for active pickup codes (cleared on pickup/cancel)
-    // NEVER stored long-term in DB (only BCrypt hash is stored in DB)
+    // Transient in-memory cache for fast lookup during active session
     private final Map<Long, String> activePickupCodes = new ConcurrentHashMap<>();
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -60,7 +64,9 @@ public class OrderService {
                         CompartmentRepository compartmentRepository,
                         MockLockerService mockLockerService,
                         PasswordEncoder passwordEncoder,
-                        EmailService emailService) {
+                        EmailService emailService,
+                        AesEncryptionService aesEncryptionService,
+                        OrderAttemptService orderAttemptService) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
@@ -69,6 +75,8 @@ public class OrderService {
         this.mockLockerService = mockLockerService;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
+        this.aesEncryptionService = aesEncryptionService;
+        this.orderAttemptService = orderAttemptService;
     }
 
     private OrderResponse mapToOrderResponse(Order order) {
@@ -149,7 +157,11 @@ public class OrderService {
 
         // Security check: ONLY the buyer can see the pickup code on their active order
         if (order.getStatus() == OrderStatus.READY_FOR_PICKUP && order.getBuyer().getUsername().equals(username)) {
-            res.setPickupCode(activePickupCodes.get(order.getId()));
+            if (order.getEncryptedPickupCode() != null) {
+                res.setPickupCode(aesEncryptionService.decrypt(order.getEncryptedPickupCode()));
+            } else {
+                res.setPickupCode(activePickupCodes.get(order.getId()));
+            }
         }
 
         return res;
@@ -241,7 +253,7 @@ public class OrderService {
             throw new AppException(ErrorCode.INVALID_ORDER_STATUS);
         }
 
-        // Allocate compartment in an ACTIVE locker
+        // Allocate compartment in an ACTIVE locker with pessimistic lock
         Compartment compartment;
         if (request != null && request.getLockerId() != null) {
             Locker locker = lockerRepository.findById(request.getLockerId())
@@ -259,12 +271,18 @@ public class OrderService {
             compartment = availableList.get(0);
         }
 
-        // Reserve compartment
-        compartment.setStatus(CompartmentStatus.RESERVED);
-        compartmentRepository.save(compartment);
+        // Lock and verify compartment is still available
+        Compartment lockedCompartment = compartmentRepository.findByIdWithLock(compartment.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+        if (lockedCompartment.getStatus() != CompartmentStatus.AVAILABLE) {
+            throw new AppException(ErrorCode.NO_AVAILABLE_COMPARTMENT);
+        }
 
-        order.setLocker(compartment.getLocker());
-        order.setCompartment(compartment);
+        lockedCompartment.setStatus(CompartmentStatus.RESERVED);
+        compartmentRepository.save(lockedCompartment);
+
+        order.setLocker(lockedCompartment.getLocker());
+        order.setCompartment(lockedCompartment);
         order.setStatus(OrderStatus.AWAITING_DEPOSIT);
 
         order = orderRepository.save(order);
@@ -285,6 +303,8 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.REJECTED);
+        order.setEncryptedPickupCode(null);
+        activePickupCodes.remove(order.getId());
         if (request != null && request.getReason() != null) {
             order.setRejectionReason(request.getReason().trim());
         }
@@ -307,6 +327,8 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.CANCELLED);
+        order.setEncryptedPickupCode(null);
+        activePickupCodes.remove(order.getId());
         order.setCancelledAt(LocalDateTime.now());
 
         order = orderRepository.save(order);
@@ -344,8 +366,9 @@ public class OrderService {
         int codeInt = secureRandom.nextInt(1_000_000);
         String rawPickupCode = String.format("%06d", codeInt);
 
-        // Hash pickup code for database persistence
+        // Hash pickup code with BCrypt and store AES-encrypted version for persistence
         order.setPickupCodeHash(passwordEncoder.encode(rawPickupCode));
+        order.setEncryptedPickupCode(aesEncryptionService.encrypt(rawPickupCode));
         order.setPickupDeadline(LocalDateTime.now().plusHours(48));
         order.setDepositAt(LocalDateTime.now());
         order.setPickupAttempts(0);
@@ -353,42 +376,42 @@ public class OrderService {
 
         order = orderRepository.save(order);
 
-        // Keep raw code in transient cache for buyer
+        // Keep raw code in transient cache for instant access
         activePickupCodes.put(order.getId(), rawPickupCode);
 
-        // Attempt asynchronous email dispatch (swallowed safely if mail server offline)
-        try {
-            String subject = "CampusHub - Thông báo nhận hàng: Đơn " + order.getOrderNumber();
-            String text = String.format(
-                    "Xin chào %s,\n\nNgười bán đã gửi đơn hàng '%s' vào tủ đồ.\n" +
-                    "Địa điểm: %s (%s)\n" +
-                    "Ngăn tủ: %s\n" +
-                    "Mã nhận hàng của bạn là: %s\n" +
-                    "Hạn lấy hàng: %s\n\n" +
-                    "Vui lòng đến đúng tủ đồ và nhập mã để nhận hàng.",
-                    order.getBuyer().getFullName(),
-                    order.getProduct().getTitle(),
-                    locker.getName(),
-                    locker.getLocation(),
-                    compartment.getCode(),
-                    rawPickupCode,
-                    order.getPickupDeadline()
-            );
-            emailService.sendEmail(order.getBuyer().getEmail(), subject, text);
-        } catch (Exception e) {
-            log.warn("Could not dispatch email notification to buyer: {}", e.getMessage());
-        }
+        // Dispatch asynchronous email safely after transaction commits
+        String subject = "CampusHub - Thông báo nhận hàng: Đơn " + order.getOrderNumber();
+        String text = String.format(
+                "Xin chào %s,\n\nNgười bán đã gửi đơn hàng '%s' vào tủ đồ.\n" +
+                "Địa điểm: %s (%s)\n" +
+                "Ngăn tủ: %s\n" +
+                "Mã nhận hàng của bạn là: %s\n" +
+                "Hạn lấy hàng: %s\n\n" +
+                "Vui lòng đến đúng tủ đồ và nhập mã để nhận hàng.",
+                order.getBuyer().getFullName(),
+                order.getProduct().getTitle(),
+                locker.getName(),
+                locker.getLocation(),
+                compartment.getCode(),
+                rawPickupCode,
+                order.getPickupDeadline()
+        );
+        sendEmailAfterCommit(order.getBuyer().getEmail(), subject, text);
 
         return mapToOrderResponse(order);
     }
 
     @Transactional
     public OrderResponse pickupOrder(Long orderId, OrderPickupRequest request, String buyerUsername) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
         if (!order.getBuyer().getUsername().equals(buyerUsername)) {
             throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        if (order.getStatus() == OrderStatus.EXPIRED) {
+            throw new AppException(ErrorCode.ORDER_EXPIRED);
         }
 
         if (order.getStatus() != OrderStatus.READY_FOR_PICKUP) {
@@ -396,16 +419,22 @@ public class OrderService {
         }
 
         if (order.getPickupDeadline() != null && LocalDateTime.now().isAfter(order.getPickupDeadline())) {
+            order.setStatus(OrderStatus.EXPIRED);
+            order.setEncryptedPickupCode(null);
+            activePickupCodes.remove(order.getId());
+            orderRepository.save(order);
             throw new AppException(ErrorCode.PICKUP_CODE_EXPIRED);
         }
 
-        if (order.getPickupAttempts() >= 5) {
+        if (order.getPickupAttempts() != null && order.getPickupAttempts() >= 5) {
             throw new AppException(ErrorCode.PICKUP_ATTEMPTS_EXCEEDED);
         }
 
         if (!passwordEncoder.matches(request.getPickupCode(), order.getPickupCodeHash())) {
-            order.setPickupAttempts(order.getPickupAttempts() + 1);
-            orderRepository.save(order);
+            int newAttempts = orderAttemptService.recordFailedPickupAttempt(order.getId());
+            if (newAttempts >= 5) {
+                throw new AppException(ErrorCode.PICKUP_ATTEMPTS_EXCEEDED);
+            }
             throw new AppException(ErrorCode.INVALID_PICKUP_CODE);
         }
 
@@ -416,9 +445,10 @@ public class OrderService {
         mockLockerService.openForPickup(locker, compartment);
         mockLockerService.confirmItemPickedUp(locker, compartment);
 
-        // Complete order
+        // Complete order and purge persistent encrypted PIN
         order.setStatus(OrderStatus.COMPLETED);
         order.setPickedUpAt(LocalDateTime.now());
+        order.setEncryptedPickupCode(null);
 
         // Free compartment safely
         compartment.setStatus(CompartmentStatus.AVAILABLE);
@@ -434,6 +464,81 @@ public class OrderService {
 
         order = orderRepository.save(order);
         return mapToOrderResponse(order);
+    }
+
+    @Transactional
+    public void checkAndExpireOrders() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Order> expiredOrders = orderRepository.findExpiredOrders(OrderStatus.READY_FOR_PICKUP, now);
+        for (Order order : expiredOrders) {
+            order.setStatus(OrderStatus.EXPIRED);
+            order.setEncryptedPickupCode(null);
+            activePickupCodes.remove(order.getId());
+            orderRepository.save(order);
+
+            sendEmailAfterCommit(
+                    order.getBuyer().getEmail(),
+                    "CampusHub - Đơn hàng đã quá hạn nhận: " + order.getOrderNumber(),
+                    "Đơn hàng của bạn tại tủ " + (order.getLocker() != null ? order.getLocker().getName() : "") +
+                    " đã quá hạn lấy đồ. Vui lòng liên hệ ban quản trị để được hỗ trợ xử lý kiện hàng."
+            );
+            sendEmailAfterCommit(
+                    order.getSeller().getEmail(),
+                    "CampusHub - Đơn hàng quá hạn nhận: " + order.getOrderNumber(),
+                    "Đơn hàng " + order.getOrderNumber() + " đã quá hạn nhận bởi người mua. Kiện hàng đang được bảo quản an toàn trong tủ đồ."
+            );
+        }
+    }
+
+    @Transactional
+    public OrderResponse adminClearExpiredOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (order.getStatus() != OrderStatus.EXPIRED) {
+            throw new AppException(ErrorCode.CANNOT_CLEAR_NON_EXPIRED_ORDER);
+        }
+
+        Locker locker = order.getLocker();
+        Compartment compartment = order.getCompartment();
+
+        if (locker != null && compartment != null) {
+            mockLockerService.openForPickup(locker, compartment);
+            mockLockerService.confirmItemPickedUp(locker, compartment);
+            compartment.setStatus(CompartmentStatus.AVAILABLE);
+            compartmentRepository.save(compartment);
+        }
+
+        Product product = order.getProduct();
+        if (product != null) {
+            product.setStatus(ProductStatus.HIDDEN);
+            productRepository.save(product);
+        }
+
+        order.setClearedAt(LocalDateTime.now());
+        order = orderRepository.save(order);
+        return mapToOrderResponse(order);
+    }
+
+    private void sendEmailAfterCommit(String to, String subject, String text) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        emailService.sendEmail(to, subject, text);
+                    } catch (Exception e) {
+                        log.warn("Could not dispatch email notification to {}: {}", to, e.getMessage());
+                    }
+                }
+            });
+        } else {
+            try {
+                emailService.sendEmail(to, subject, text);
+            } catch (Exception e) {
+                log.warn("Could not dispatch email notification to {}: {}", to, e.getMessage());
+            }
+        }
     }
 
     // Helper method for integration tests

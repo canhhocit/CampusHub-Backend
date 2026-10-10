@@ -104,4 +104,11 @@ public class OrderController {
             Authentication authentication) {
         return ResponseEntity.ok(orderService.pickupOrder(id, request, authentication.getName()));
     }
+
+    @PostMapping("/{id}/clear-expired")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OrderResponse> clearExpiredOrder(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(orderService.adminClearExpiredOrder(id));
+    }
 }

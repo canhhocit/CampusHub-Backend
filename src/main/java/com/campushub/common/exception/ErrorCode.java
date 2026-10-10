@@ -33,7 +33,9 @@ public enum ErrorCode {
     PICKUP_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "Pickup code has expired"),
     PICKUP_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Exceeded maximum pickup attempts. Please contact support."),
     LOCKER_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "Locker is currently not active"),
-    MOCK_IOT_DEVICE_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "Locker hardware error occurred");
+    MOCK_IOT_DEVICE_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "Locker hardware error occurred"),
+    ORDER_EXPIRED(HttpStatus.BAD_REQUEST, "Order has expired and can no longer be picked up"),
+    CANNOT_CLEAR_NON_EXPIRED_ORDER(HttpStatus.BAD_REQUEST, "Cannot clear an order that is not expired");
 
     private final HttpStatus status;
     private final String message;

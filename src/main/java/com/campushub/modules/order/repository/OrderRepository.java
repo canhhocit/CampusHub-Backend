@@ -29,4 +29,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT COUNT(o) > 0 FROM Order o WHERE o.compartment.id = :compartmentId AND o.status IN :statuses")
     boolean existsByCompartmentIdAndStatusIn(@Param("compartmentId") Long compartmentId, @Param("statuses") Collection<OrderStatus> statuses);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    Optional<Order> findByIdWithLock(@Param("id") Long id);
+
+    @Query("SELECT o FROM Order o WHERE o.status = :status AND o.pickupDeadline < :now")
+    java.util.List<Order> findExpiredOrders(@Param("status") OrderStatus status, @Param("now") java.time.LocalDateTime now);
 }

@@ -47,6 +47,9 @@ public class Order extends BaseEntity {
     @Column(name = "pickup_code_hash")
     private String pickupCodeHash;
 
+    @Column(name = "encrypted_pickup_code")
+    private String encryptedPickupCode;
+
     @Column(name = "pickup_deadline")
     private LocalDateTime pickupDeadline;
 
@@ -61,6 +64,9 @@ public class Order extends BaseEntity {
 
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
+
+    @Column(name = "cleared_at")
+    private LocalDateTime clearedAt;
 
     @Column(name = "rejection_reason")
     private String rejectionReason;
@@ -187,6 +193,22 @@ public class Order extends BaseEntity {
 
     public void setRejectionReason(String rejectionReason) {
         this.rejectionReason = rejectionReason;
+    }
+
+    public String getEncryptedPickupCode() {
+        return encryptedPickupCode;
+    }
+
+    public void setEncryptedPickupCode(String encryptedPickupCode) {
+        this.encryptedPickupCode = encryptedPickupCode;
+    }
+
+    public LocalDateTime getClearedAt() {
+        return clearedAt;
+    }
+
+    public void setClearedAt(LocalDateTime clearedAt) {
+        this.clearedAt = clearedAt;
     }
 
     public Long getVersion() {

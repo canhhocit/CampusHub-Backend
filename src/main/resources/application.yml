@@ -36,8 +36,12 @@ app:
     secret: ${JWT_SECRET:super_secret_key_change_in_production_min_256_bits_length_for_hmac_sha256}
     access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  security:
+    pickup-encryption-key: ${PICKUP_ENCRYPTION_KEY:DefaultCampusHubSecretAesKey32Bytes!}
   admin:
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  order:
+    expiration-check-interval-ms: ${ORDER_EXPIRATION_CHECK_INTERVAL_MS:60000}
