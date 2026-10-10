@@ -1,0 +1,37 @@
+package com.campushub.modules.marketplace.dto;
+
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
+
+public class ProductCreateRequest {
+    
+    @NotBlank
+    @Size(max = 150)
+    private String title;
+    
+    private String description;
+    
+    @NotNull
+    @DecimalMin(value = "0.0", inclusive = true)
+    private BigDecimal price;
+    
+    @Size(max = 500)
+    private String imageUrl;
+    
+    @NotNull
+    private Long categoryId;
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public BigDecimal getPrice() { return price; }
+    public void setPrice(BigDecimal price) { this.price = price; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public Long getCategoryId() { return categoryId; }
+    public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
+}
