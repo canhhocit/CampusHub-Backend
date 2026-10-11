@@ -22,7 +22,7 @@ public class UserPrincipal implements UserDetails {
         this.username = user.getUsername();
         this.email = user.getEmail();
         this.password = user.getPasswordHash();
-        this.authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
+        this.authorities = Collections.singletonList(new SimpleGrantedAuthority(user.getRole().toAuthority()));
         this.status = user.getStatus().name();
     }
 
@@ -56,7 +56,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return !"LOCKED".equals(status);
+        return !com.campushub.common.enums.UserStatus.LOCKED.name().equals(status);
     }
 
     @Override
@@ -66,6 +66,6 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return "ACTIVE".equals(status);
+        return com.campushub.common.enums.UserStatus.ACTIVE.name().equals(status);
     }
 }

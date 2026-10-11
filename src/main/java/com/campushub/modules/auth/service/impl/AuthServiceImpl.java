@@ -48,6 +48,9 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.jwt.refresh-expiration}")
     private long refreshExpirationMs;
 
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
+
     public AuthServiceImpl(UserRepository userRepository,
                            RefreshTokenRepository refreshTokenRepository,
                            VerificationTokenRepository verificationTokenRepository,
@@ -67,10 +70,17 @@ public class AuthServiceImpl implements AuthService {
     private void checkRateLimit(String cacheName, String key, int maxRequests) {
         Cache cache = cacheManager.getCache(cacheName);
         if (cache != null) {
-            AtomicInteger count = cache.get(key, AtomicInteger.class);
-            if (count == null) {
-                cache.put(key, new AtomicInteger(1));
-            } else if (count.incrementAndGet() > maxRequests) {
+            // get-or-create atomically to avoid two threads both seeing null and both inserting 1
+            Cache.ValueWrapper wrapper = cache.get(key);
+            AtomicInteger count;
+            if (wrapper == null) {
+                AtomicInteger newCounter = new AtomicInteger(1);
+                Cache.ValueWrapper existing = cache.putIfAbsent(key, newCounter);
+                count = (existing == null) ? newCounter : (AtomicInteger) existing.get();
+            } else {
+                count = (AtomicInteger) wrapper.get();
+            }
+            if (count != null && count.incrementAndGet() > maxRequests) {
                 throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
             }
         }
@@ -120,7 +130,7 @@ public class AuthServiceImpl implements AuthService {
         vt.setExpiresAt(LocalDateTime.now().plusHours(24));
         verificationTokenRepository.save(vt);
 
-        String verifyLink = "http://localhost:5173/verify-email?token=" + rawToken;
+        String verifyLink = frontendUrl + "/verify-email?token=" + rawToken;
         emailService.sendEmail(user.getEmail(), "Verify your CampusHub account", "Please click the link to verify: " + verifyLink);
     }
 
@@ -162,7 +172,7 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.USER_LOCKED);
         }
 
-        String accessToken = jwtProvider.generateAccessTokenFromUsernameAndIdAndRole(user.getUsername(), user.getId(), "ROLE_" + user.getRole().name());
+        String accessToken = jwtProvider.generateAccessTokenFromUsernameAndIdAndRole(user.getUsername(), user.getId(), user.getRole().toAuthority());
         setRefreshTokenCookie(user, httpResponse);
 
         return new TokenResponse(accessToken);
@@ -221,7 +231,7 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.USER_LOCKED);
         }
 
-        String accessToken = jwtProvider.generateAccessTokenFromUsernameAndIdAndRole(user.getUsername(), user.getId(), "ROLE_" + user.getRole().name());
+        String accessToken = jwtProvider.generateAccessTokenFromUsernameAndIdAndRole(user.getUsername(), user.getId(), user.getRole().toAuthority());
         setRefreshTokenCookie(user, httpResponse);
 
         return new TokenResponse(accessToken);
@@ -269,7 +279,7 @@ public class AuthServiceImpl implements AuthService {
         vt.setExpiresAt(LocalDateTime.now().plusHours(1));
         verificationTokenRepository.save(vt);
 
-        String resetLink = "http://localhost:5173/reset-password?token=" + rawToken;
+        String resetLink = frontendUrl + "/reset-password?token=" + rawToken;
         emailService.sendEmail(user.getEmail(), "Reset your CampusHub password", "Please click the link to reset password: " + resetLink);
     }
 

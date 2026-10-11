@@ -1,6 +1,7 @@
 package com.campushub.modules.order.service;
 
 import com.campushub.common.email.EmailService;
+import com.campushub.common.enums.Role;
 import com.campushub.common.exception.AppException;
 import com.campushub.common.exception.ErrorCode;
 import com.campushub.modules.locker.entity.Compartment;
@@ -232,7 +233,7 @@ public class OrderService {
         if (!isBuyer && !isSeller) {
             User user = userRepository.findByUsername(username)
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-            if (!"ROLE_ADMIN".equals(user.getRole().name()) && !"ADMIN".equals(user.getRole().name())) {
+            if (user.getRole() != Role.ADMIN) {
                 throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
             }
         }
