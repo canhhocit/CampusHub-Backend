@@ -2,6 +2,8 @@ package com.campushub.modules.marketplace.controller;
 
 import com.campushub.modules.marketplace.dto.*;
 import com.campushub.modules.marketplace.service.MarketplaceService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,6 +19,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1")
+@Tag(name = "Marketplace", description = "Product and category management APIs")
 public class MarketplaceController {
 
     private final MarketplaceService marketplaceService;
@@ -28,6 +31,33 @@ public class MarketplaceController {
     @GetMapping("/categories")
     public ResponseEntity<List<CategoryResponse>> getCategories() {
         return ResponseEntity.ok(marketplaceService.getActiveCategories());
+    }
+
+    @GetMapping("/categories/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<CategoryResponse>> getAllCategories() {
+        return ResponseEntity.ok(marketplaceService.getAllCategories());
+    }
+
+    @PostMapping("/categories")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CategoryResponse> createCategory(
+            @Valid @RequestBody com.campushub.modules.marketplace.dto.CategoryCreateRequest request) {
+        return new ResponseEntity<>(marketplaceService.createCategory(request), HttpStatus.CREATED);
+    }
+
+    @PutMapping("/categories/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CategoryResponse> updateCategory(
+            @PathVariable Long id,
+            @Valid @RequestBody com.campushub.modules.marketplace.dto.CategoryUpdateRequest request) {
+        return ResponseEntity.ok(marketplaceService.updateCategory(id, request));
+    }
+
+    @PatchMapping("/categories/{id}/toggle")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CategoryResponse> toggleCategory(@PathVariable Long id) {
+        return ResponseEntity.ok(marketplaceService.toggleCategory(id));
     }
 
     @GetMapping("/products")

@@ -60,6 +60,39 @@ public class MarketplaceService {
     }
 
     @Transactional(readOnly = true)
+    public List<CategoryResponse> getAllCategories() {
+        return categoryRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing(Category::getName))
+                .map(this::mapCategory).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public CategoryResponse createCategory(com.campushub.modules.marketplace.dto.CategoryCreateRequest request) {
+        String slug = request.getSlug().trim().toLowerCase().replaceAll("[^a-z0-9-]", "-");
+        Category category = new Category();
+        category.setName(request.getName().trim());
+        category.setSlug(slug);
+        category.setActive(true);
+        return mapCategory(categoryRepository.save(category));
+    }
+
+    @Transactional
+    public CategoryResponse updateCategory(Long id, com.campushub.modules.marketplace.dto.CategoryUpdateRequest request) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+        category.setName(request.getName().trim());
+        return mapCategory(categoryRepository.save(category));
+    }
+
+    @Transactional
+    public CategoryResponse toggleCategory(Long id) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+        category.setActive(!category.getActive());
+        return mapCategory(categoryRepository.save(category));
+    }
+
+    @Transactional(readOnly = true)
     public Page<ProductResponse> getPublicProducts(Long categoryId, String search, Pageable pageable) {
         String searchPattern = (search == null || search.trim().isEmpty()) ? null : "%" + search.trim() + "%";
         return productRepository.findAllPublicProducts(ProductStatus.ACTIVE, categoryId, searchPattern, pageable)

@@ -2,6 +2,8 @@ package com.campushub.modules.order.controller;
 
 import com.campushub.modules.order.dto.*;
 import com.campushub.modules.order.service.OrderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/orders")
+@Tag(name = "Orders", description = "Order management and pickup APIs")
 public class OrderController {
 
     private final OrderService orderService;

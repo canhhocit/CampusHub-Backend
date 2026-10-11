@@ -128,9 +128,49 @@ public class LockerService {
         Locker locker = lockerRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.LOCKER_NOT_FOUND));
 
-        locker.setStatus(request.getStatus());
+        LockerStatus current = locker.getStatus();
+        LockerStatus target = request.getStatus();
+
+        // Validate status transition
+        validateLockerStatusTransition(current, target);
+
+        locker.setStatus(target);
         locker = lockerRepository.save(locker);
         return mapLocker(locker);
+    }
+
+    /**
+     * Validate locker status transitions.
+     * Valid transitions:
+     * - ACTIVE ↔ INACTIVE
+     * - ACTIVE → MAINTENANCE
+     * - INACTIVE → MAINTENANCE
+     * - MAINTENANCE → ACTIVE
+     * - MAINTENANCE → INACTIVE
+     * - Any status → OFFLINE (emergency)
+     * - OFFLINE → MAINTENANCE (recovery)
+     */
+    private void validateLockerStatusTransition(LockerStatus current, LockerStatus target) {
+        if (current == target) {
+            return; // No change
+        }
+
+        boolean isValid = switch (current) {
+            case ACTIVE -> target == LockerStatus.INACTIVE 
+                        || target == LockerStatus.MAINTENANCE 
+                        || target == LockerStatus.OFFLINE;
+            case INACTIVE -> target == LockerStatus.ACTIVE 
+                          || target == LockerStatus.MAINTENANCE 
+                          || target == LockerStatus.OFFLINE;
+            case MAINTENANCE -> target == LockerStatus.ACTIVE 
+                             || target == LockerStatus.INACTIVE 
+                             || target == LockerStatus.OFFLINE;
+            case OFFLINE -> target == LockerStatus.MAINTENANCE; // Only to MAINTENANCE for recovery
+        };
+
+        if (!isValid) {
+            throw new AppException(ErrorCode.INVALID_LOCKER_STATUS);
+        }
     }
 
     @Transactional(readOnly = true)
