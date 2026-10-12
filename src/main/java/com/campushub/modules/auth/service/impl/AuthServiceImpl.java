@@ -21,6 +21,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -196,12 +198,14 @@ public class AuthServiceImpl implements AuthService {
         rt.setExpiresAt(LocalDateTime.now().plusSeconds(refreshExpirationMs / 1000));
         refreshTokenRepository.save(rt);
 
-        Cookie cookie = new Cookie("refresh_token", rawToken);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false); // set to true in production if HTTPS
-        cookie.setPath("/api/v1/auth/refresh");
-        cookie.setMaxAge((int) (refreshExpirationMs / 1000));
-        response.addCookie(cookie);
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", rawToken)
+                .httpOnly(true)
+                .secure(false) // set to true in production if HTTPS
+                .path("/")
+                .maxAge(refreshExpirationMs / 1000)
+                .sameSite("Lax")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     @Override
@@ -258,12 +262,14 @@ public class AuthServiceImpl implements AuthService {
             });
         }
 
-        Cookie cookie = new Cookie("refresh_token", null);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false);
-        cookie.setPath("/api/v1/auth/refresh");
-        cookie.setMaxAge(0);
-        httpResponse.addCookie(cookie);
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .sameSite("Lax")
+                .build();
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     @Override
