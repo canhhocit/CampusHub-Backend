@@ -46,7 +46,12 @@ public class MarketplaceService {
         res.setImageUrl(product.getImageUrl());
         res.setStatus(product.getStatus());
         res.setCategory(mapCategory(product.getCategory()));
-        res.setOwner(new ProductResponse.OwnerResponse(product.getOwner().getId(), product.getOwner().getUsername(), product.getOwner().getFullName()));
+        res.setOwner(new ProductResponse.OwnerResponse(
+                product.getOwner().getId(),
+                product.getOwner().getUsername(),
+                product.getOwner().getFullName(),
+                product.getOwner().getIdentityVerified()
+        ));
         res.setCreatedAt(product.getCreatedAt());
         res.setUpdatedAt(product.getUpdatedAt());
         res.setVersion(product.getVersion());

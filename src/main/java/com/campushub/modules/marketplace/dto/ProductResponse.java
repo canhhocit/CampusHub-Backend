@@ -22,6 +22,7 @@ public class ProductResponse {
         private Long id;
         private String username;
         private String fullName;
+        private Boolean identityVerified;
 
         public OwnerResponse(Long id, String fullName) {
             this.id = id;
@@ -34,9 +35,17 @@ public class ProductResponse {
             this.fullName = fullName;
         }
 
+        public OwnerResponse(Long id, String username, String fullName, Boolean identityVerified) {
+            this.id = id;
+            this.username = username;
+            this.fullName = fullName;
+            this.identityVerified = identityVerified;
+        }
+
         public Long getId() { return id; }
         public String getUsername() { return username; }
         public String getFullName() { return fullName; }
+        public Boolean getIdentityVerified() { return identityVerified; }
     }
 
     // Builder or Setters

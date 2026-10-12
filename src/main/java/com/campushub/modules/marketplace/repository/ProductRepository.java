@@ -17,7 +17,7 @@ import java.util.Optional;
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @EntityGraph(attributePaths = {"category", "owner"})
-    @Query("SELECT p FROM Product p WHERE p.status = :status AND (:categoryId IS NULL OR p.category.id = :categoryId) AND (:search IS NULL OR LOWER(p.title) LIKE LOWER(CAST(:search AS string)))")
+    @Query("SELECT p FROM Product p WHERE p.status = :status AND (:categoryId IS NULL OR p.category.id = :categoryId) AND (:search IS NULL OR LOWER(p.title) LIKE LOWER(CAST(:search AS string)) OR (p.description IS NOT NULL AND LOWER(p.description) LIKE LOWER(CAST(:search AS string))))")
     Page<Product> findAllPublicProducts(@Param("status") ProductStatus status, 
                                         @Param("categoryId") Long categoryId, 
                                         @Param("search") String search, 
