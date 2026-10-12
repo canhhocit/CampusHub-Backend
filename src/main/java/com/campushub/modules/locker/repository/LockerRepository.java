@@ -20,7 +20,10 @@ public interface LockerRepository extends JpaRepository<Locker, Long> {
 
     @Query("SELECT l FROM Locker l WHERE " +
            "(:status IS NULL OR l.status = :status) AND " +
-           "(:search IS NULL OR LOWER(l.code) LIKE LOWER(:search) OR LOWER(l.name) LIKE LOWER(:search) OR LOWER(l.location) LIKE LOWER(:search))")
+           "(CAST(:search AS string) IS NULL OR " +
+           "LOWER(l.code) LIKE CAST(:search AS string) OR " +
+           "LOWER(l.name) LIKE CAST(:search AS string) OR " +
+           "LOWER(l.location) LIKE CAST(:search AS string))")
     Page<Locker> findAllWithFilters(@Param("status") LockerStatus status,
                                     @Param("search") String search,
                                     Pageable pageable);

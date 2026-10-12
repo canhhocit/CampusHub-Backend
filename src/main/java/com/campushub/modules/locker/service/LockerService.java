@@ -57,7 +57,7 @@ public class LockerService {
 
     @Transactional(readOnly = true)
     public Page<LockerResponse> getLockers(LockerStatus status, String search, Pageable pageable) {
-        String searchPattern = (search == null || search.trim().isEmpty()) ? null : "%" + search.trim() + "%";
+        String searchPattern = (search == null || search.trim().isEmpty()) ? null : "%" + search.trim().toLowerCase() + "%";
         return lockerRepository.findAllWithFilters(status, searchPattern, pageable)
                 .map(this::mapLocker);
     }

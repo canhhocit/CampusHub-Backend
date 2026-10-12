@@ -25,7 +25,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     long countByCreatedAtAfter(LocalDateTime date);
 
     @Query("SELECT u FROM User u WHERE " +
-            "(:search IS NULL OR LOWER(u.username) LIKE :search OR LOWER(u.email) LIKE :search OR LOWER(u.fullName) LIKE :search) AND " +
+            "(CAST(:search AS string) IS NULL OR LOWER(u.username) LIKE CAST(:search AS string) OR LOWER(u.email) LIKE CAST(:search AS string) OR LOWER(u.fullName) LIKE CAST(:search AS string)) AND " +
             "(:status IS NULL OR u.status = :status)")
     Page<User> findAllWithFilters(
             @Param("search") String search,
