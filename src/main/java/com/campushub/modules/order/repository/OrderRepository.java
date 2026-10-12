@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Optional;
 
@@ -36,4 +37,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT o FROM Order o WHERE o.status = :status AND o.pickupDeadline < :now")
     java.util.List<Order> findExpiredOrders(@Param("status") OrderStatus status, @Param("now") java.time.LocalDateTime now);
+
+    // Admin dashboard queries
+    long countByStatus(OrderStatus status);
+
+    long countByCreatedAtAfter(LocalDateTime dateTime);
+
+    long countByStatusAndPickedUpAtAfter(OrderStatus status, LocalDateTime dateTime);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.buyer.id = :buyerId OR o.seller.id = :sellerId")
+    long countByBuyerIdOrSellerId(@Param("buyerId") Long buyerId, @Param("sellerId") Long sellerId);
 }

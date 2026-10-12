@@ -29,4 +29,7 @@ public interface CompartmentRepository extends JpaRepository<Compartment, Long> 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("SELECT c FROM Compartment c WHERE c.id = :id")
     Optional<Compartment> findByIdWithLock(@org.springframework.data.repository.query.Param("id") Long id);
+
+    // Admin dashboard queries
+    long countByStatus(CompartmentStatus status);
 }

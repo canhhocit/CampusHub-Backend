@@ -24,4 +24,7 @@ public interface LockerRepository extends JpaRepository<Locker, Long> {
     Page<Locker> findAllWithFilters(@Param("status") LockerStatus status,
                                     @Param("search") String search,
                                     Pageable pageable);
+
+    // Admin dashboard queries
+    long countByStatus(LockerStatus status);
 }
