@@ -25,6 +25,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Admin dashboard queries
     long countByStatus(UserStatus status);
     long countByCreatedAtAfter(LocalDateTime date);
+    long countByIdentityVerifiedTrue();
 
     @Query("SELECT u FROM User u WHERE " +
             "(CAST(:search AS string) IS NULL OR LOWER(u.username) LIKE CAST(:search AS string) OR LOWER(u.email) LIKE CAST(:search AS string) OR LOWER(u.fullName) LIKE CAST(:search AS string)) AND " +

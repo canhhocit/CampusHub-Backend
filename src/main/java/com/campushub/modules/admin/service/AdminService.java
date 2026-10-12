@@ -77,6 +77,9 @@ public class AdminService {
         stats.setLockedUsers(userRepository.countByStatus(UserStatus.LOCKED));
         stats.setNewUsersToday(userRepository.countByCreatedAtAfter(today));
         stats.setNewUsersThisWeek(userRepository.countByCreatedAtAfter(weekAgo));
+        long verified = userRepository.countByIdentityVerifiedTrue();
+        stats.setVerifiedUsers(verified);
+        stats.setUnverifiedUsers(Math.max(0, stats.getTotalUsers() - verified));
 
         return stats;
     }

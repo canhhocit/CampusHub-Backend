@@ -15,6 +15,8 @@ public class DashboardStatsResponse {
         private long lockedUsers;
         private long newUsersToday;
         private long newUsersThisWeek;
+        private long verifiedUsers;
+        private long unverifiedUsers;
 
         // Getters and Setters
         public long getTotalUsers() { return totalUsers; }
@@ -29,6 +31,10 @@ public class DashboardStatsResponse {
         public void setNewUsersToday(long newUsersToday) { this.newUsersToday = newUsersToday; }
         public long getNewUsersThisWeek() { return newUsersThisWeek; }
         public void setNewUsersThisWeek(long newUsersThisWeek) { this.newUsersThisWeek = newUsersThisWeek; }
+        public long getVerifiedUsers() { return verifiedUsers; }
+        public void setVerifiedUsers(long verifiedUsers) { this.verifiedUsers = verifiedUsers; }
+        public long getUnverifiedUsers() { return unverifiedUsers; }
+        public void setUnverifiedUsers(long unverifiedUsers) { this.unverifiedUsers = unverifiedUsers; }
     }
 
     public static class ProductStats {
