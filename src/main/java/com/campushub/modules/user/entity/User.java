@@ -32,6 +32,21 @@ public class User extends BaseEntity {
     @Column(name = "date_of_birth")
     private java.time.LocalDate dateOfBirth;
 
+    @Column(name = "identity_verified")
+    private Boolean identityVerified = false;
+
+    @Column(name = "citizen_id", length = 20, unique = true)
+    private String citizenId;
+
+    @Column(name = "id_card_front_url", length = 500)
+    private String idCardFrontUrl;
+
+    @Column(name = "id_card_back_url", length = 500)
+    private String idCardBackUrl;
+
+    @Column(name = "identity_verified_at")
+    private java.time.LocalDateTime identityVerifiedAt;
+
     // Getters and Setters
     public String getUsername() {
         return username;
@@ -87,5 +102,45 @@ public class User extends BaseEntity {
 
     public void setDateOfBirth(java.time.LocalDate dateOfBirth) {
         this.dateOfBirth = dateOfBirth;
+    }
+
+    public Boolean getIdentityVerified() {
+        return identityVerified;
+    }
+
+    public void setIdentityVerified(Boolean identityVerified) {
+        this.identityVerified = identityVerified;
+    }
+
+    public String getCitizenId() {
+        return citizenId;
+    }
+
+    public void setCitizenId(String citizenId) {
+        this.citizenId = citizenId;
+    }
+
+    public String getIdCardFrontUrl() {
+        return idCardFrontUrl;
+    }
+
+    public void setIdCardFrontUrl(String idCardFrontUrl) {
+        this.idCardFrontUrl = idCardFrontUrl;
+    }
+
+    public String getIdCardBackUrl() {
+        return idCardBackUrl;
+    }
+
+    public void setIdCardBackUrl(String idCardBackUrl) {
+        this.idCardBackUrl = idCardBackUrl;
+    }
+
+    public java.time.LocalDateTime getIdentityVerifiedAt() {
+        return identityVerifiedAt;
+    }
+
+    public void setIdentityVerifiedAt(java.time.LocalDateTime identityVerifiedAt) {
+        this.identityVerifiedAt = identityVerifiedAt;
     }
 }

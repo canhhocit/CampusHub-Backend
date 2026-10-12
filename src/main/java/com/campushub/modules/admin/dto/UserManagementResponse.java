@@ -15,6 +15,11 @@ public class UserManagementResponse {
     private Role role;
     private UserStatus status;
     private LocalDate dateOfBirth;
+    private Boolean identityVerified;
+    private String citizenId;
+    private String idCardFrontUrl;
+    private String idCardBackUrl;
+    private LocalDateTime identityVerifiedAt;
     private LocalDateTime createdAt;
     private LocalDateTime lastLogin;
     private long totalProducts;
@@ -35,6 +40,16 @@ public class UserManagementResponse {
     public void setStatus(UserStatus status) { this.status = status; }
     public LocalDate getDateOfBirth() { return dateOfBirth; }
     public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
+    public Boolean getIdentityVerified() { return identityVerified; }
+    public void setIdentityVerified(Boolean identityVerified) { this.identityVerified = identityVerified; }
+    public String getCitizenId() { return citizenId; }
+    public void setCitizenId(String citizenId) { this.citizenId = citizenId; }
+    public String getIdCardFrontUrl() { return idCardFrontUrl; }
+    public void setIdCardFrontUrl(String idCardFrontUrl) { this.idCardFrontUrl = idCardFrontUrl; }
+    public String getIdCardBackUrl() { return idCardBackUrl; }
+    public void setIdCardBackUrl(String idCardBackUrl) { this.idCardBackUrl = idCardBackUrl; }
+    public LocalDateTime getIdentityVerifiedAt() { return identityVerifiedAt; }
+    public void setIdentityVerifiedAt(LocalDateTime identityVerifiedAt) { this.identityVerifiedAt = identityVerifiedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getLastLogin() { return lastLogin; }

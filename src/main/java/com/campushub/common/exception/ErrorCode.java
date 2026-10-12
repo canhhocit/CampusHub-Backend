@@ -36,7 +36,11 @@ public enum ErrorCode {
     MOCK_IOT_DEVICE_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "Locker hardware error occurred"),
     ORDER_EXPIRED(HttpStatus.BAD_REQUEST, "Order has expired and can no longer be picked up"),
     CANNOT_CLEAR_NON_EXPIRED_ORDER(HttpStatus.BAD_REQUEST, "Cannot clear an order that is not expired"),
-    AGE_RESTRICTION(HttpStatus.BAD_REQUEST, "Bạn phải từ đủ 13 tuổi trở lên để đăng ký tài khoản");
+    AGE_RESTRICTION(HttpStatus.BAD_REQUEST, "Bạn phải từ đủ 13 tuổi trở lên để đăng ký tài khoản"),
+    IDENTITY_NOT_VERIFIED(HttpStatus.FORBIDDEN, "Bạn cần xác minh danh tính (CCCD) để thực hiện giao dịch này"),
+    CITIZEN_ID_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Số CCCD này đã được sử dụng để xác minh một tài khoản khác"),
+    INVALID_CITIZEN_ID(HttpStatus.BAD_REQUEST, "Số CCCD không hợp lệ (phải gồm đúng 12 chữ số)"),
+    ALREADY_IDENTITY_VERIFIED(HttpStatus.BAD_REQUEST, "Tài khoản của bạn đã được xác minh danh tính");
 
     private final HttpStatus status;
     private final String message;

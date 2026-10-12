@@ -22,9 +22,11 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.campushub.modules.user.repository.UserRepository userRepository;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, com.campushub.modules.user.repository.UserRepository userRepository) {
         this.authService = authService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/register")
@@ -85,6 +87,15 @@ public class AuthController {
         Map<String, Object> response = new HashMap<>();
         response.put("username", authentication.getName());
         response.put("authorities", authentication.getAuthorities());
+        userRepository.findByUsername(authentication.getName()).ifPresent(u -> {
+            boolean isVerified = u.getRole() == com.campushub.common.enums.Role.ADMIN 
+                    || Boolean.TRUE.equals(u.getIdentityVerified());
+            response.put("identityVerified", isVerified);
+            response.put("fullName", u.getFullName());
+            response.put("email", u.getEmail());
+            response.put("citizenId", u.getCitizenId());
+            response.put("dateOfBirth", u.getDateOfBirth());
+        });
         return ResponseEntity.ok(response);
     }
 }

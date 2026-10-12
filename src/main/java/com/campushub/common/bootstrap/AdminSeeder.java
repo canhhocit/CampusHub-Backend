@@ -46,6 +46,7 @@ public class AdminSeeder implements CommandLineRunner {
             admin.setFullName("System Administrator");
             admin.setRole(Role.ADMIN);
             admin.setStatus(UserStatus.ACTIVE);
+            admin.setIdentityVerified(true);
 
             // Avoid username collision
             if (userRepository.existsByUsername("admin")) {

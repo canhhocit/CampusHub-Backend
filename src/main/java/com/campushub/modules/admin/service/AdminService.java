@@ -203,6 +203,13 @@ public class AdminService {
         response.setRole(user.getRole());
         response.setStatus(user.getStatus());
         response.setDateOfBirth(user.getDateOfBirth());
+        boolean isVerified = user.getRole() == com.campushub.common.enums.Role.ADMIN 
+                || Boolean.TRUE.equals(user.getIdentityVerified());
+        response.setIdentityVerified(isVerified);
+        response.setCitizenId(user.getCitizenId());
+        response.setIdCardFrontUrl(user.getIdCardFrontUrl());
+        response.setIdCardBackUrl(user.getIdCardBackUrl());
+        response.setIdentityVerifiedAt(user.getIdentityVerifiedAt());
         response.setCreatedAt(user.getCreatedAt());
 
         // Count user's products and orders

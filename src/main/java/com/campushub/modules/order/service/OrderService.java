@@ -173,6 +173,10 @@ public class OrderService {
         User buyer = userRepository.findByUsername(buyerUsername)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        if (buyer.getRole() != com.campushub.common.enums.Role.ADMIN && !Boolean.TRUE.equals(buyer.getIdentityVerified())) {
+            throw new AppException(ErrorCode.IDENTITY_NOT_VERIFIED);
+        }
+
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
 

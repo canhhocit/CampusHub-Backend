@@ -34,4 +34,12 @@ public class UserController {
             @Valid @RequestBody UpdateProfileRequest request) {
         return ResponseEntity.ok(userService.updateProfile(authentication.getName(), request));
     }
+
+    @PostMapping("/verify-identity")
+    @Operation(summary = "Verify identity with CCCD", description = "Submit citizen ID (CCCD) details and card images to verify identity")
+    public ResponseEntity<UserProfileResponse> verifyIdentity(
+            Authentication authentication,
+            @Valid @RequestBody com.campushub.modules.user.dto.VerifyIdentityRequest request) {
+        return ResponseEntity.ok(userService.verifyIdentity(authentication.getName(), request));
+    }
 }

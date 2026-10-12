@@ -124,6 +124,10 @@ public class MarketplaceService {
     public ProductResponse createProduct(ProductCreateRequest request, String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.getRole() != com.campushub.common.enums.Role.ADMIN && !Boolean.TRUE.equals(user.getIdentityVerified())) {
+            throw new AppException(ErrorCode.IDENTITY_NOT_VERIFIED);
+        }
                 
         Category category = categoryRepository.findByIdAndIsActiveTrue(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
