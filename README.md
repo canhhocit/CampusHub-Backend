@@ -474,7 +474,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Authors
 
-- **Canh Ho** - *Initial work* - [canhhocit](https://github.com/canhhocit)
+- **canhhocit** - *Initial work* - [canhhocit](https://github.com/canhhocit)
 
 ---
 
@@ -482,7 +482,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For questions, issues, or suggestions:
 
-- **Email:** canhhocit@gmail.com
+- **Email:** canhhuu26@gmail.com
 - **Issues:** [GitHub Issues](https://github.com/canhhocit/CampusHub-Backend/issues)
 
 ---

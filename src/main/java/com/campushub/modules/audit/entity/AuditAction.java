@@ -1,0 +1,51 @@
+package com.campushub.modules.audit.entity;
+
+public enum AuditAction {
+    // User actions
+    USER_LOGIN,
+    USER_LOGOUT,
+    USER_REGISTER,
+    USER_PROFILE_UPDATE,
+    USER_PASSWORD_CHANGE,
+    USER_STATUS_CHANGE,
+
+    // Product actions
+    PRODUCT_CREATE,
+    PRODUCT_UPDATE,
+    PRODUCT_DELETE,
+    PRODUCT_STATUS_CHANGE,
+
+    // Category actions
+    CATEGORY_CREATE,
+    CATEGORY_UPDATE,
+    CATEGORY_DELETE,
+    CATEGORY_TOGGLE,
+
+    // Locker actions
+    LOCKER_CREATE,
+    LOCKER_UPDATE,
+    LOCKER_STATUS_CHANGE,
+    COMPARTMENT_CREATE,
+    COMPARTMENT_STATUS_CHANGE,
+
+    // Order actions
+    ORDER_CREATE,
+    ORDER_ACCEPT,
+    ORDER_REJECT,
+    ORDER_CANCEL,
+    ORDER_DEPOSIT,
+    ORDER_PICKUP,
+    ORDER_PICKUP_FAILED,
+    ORDER_EXPIRED,
+    ORDER_CLEARED,
+
+    // Admin actions
+    ADMIN_ACCESS_DASHBOARD,
+    ADMIN_VIEW_USERS,
+    ADMIN_VIEW_ORDERS,
+    ADMIN_CLEAR_EXPIRED_ORDER,
+
+    // System actions
+    TOKEN_CLEANUP,
+    SYSTEM_ERROR
+}

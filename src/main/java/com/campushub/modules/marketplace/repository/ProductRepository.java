@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -30,4 +31,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     
     @EntityGraph(attributePaths = {"category", "owner"})
     Optional<Product> findById(Long id);
+
+    // Admin dashboard queries
+    long countByStatus(ProductStatus status);
+    long countByCreatedAtAfter(LocalDateTime date);
+    long countByOwnerId(Long ownerId);
 }
