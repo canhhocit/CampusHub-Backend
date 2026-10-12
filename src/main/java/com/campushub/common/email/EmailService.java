@@ -27,6 +27,7 @@ public class EmailService {
 
     @Async
     public void sendEmail(String to, String subject, String text) {
+        log.info("[EMAIL DISPATCH] To: {} | Subject: '{}' | Body/Link: {}", to, subject, text);
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
