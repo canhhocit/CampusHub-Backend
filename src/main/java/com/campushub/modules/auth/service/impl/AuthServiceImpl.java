@@ -113,12 +113,21 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.USER_ALREADY_EXISTS);
         }
 
+        if (request.getDateOfBirth() == null) {
+            throw new AppException(ErrorCode.AGE_RESTRICTION);
+        }
+        int age = java.time.Period.between(request.getDateOfBirth(), java.time.LocalDate.now()).getYears();
+        if (age < 13 || request.getDateOfBirth().isAfter(java.time.LocalDate.now())) {
+            throw new AppException(ErrorCode.AGE_RESTRICTION);
+        }
+
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getFullName());
-        user.setRole(Role.STUDENT);
+        user.setDateOfBirth(request.getDateOfBirth());
+        user.setRole(Role.USER);
         user.setStatus(UserStatus.PENDING);
         userRepository.save(user);
 

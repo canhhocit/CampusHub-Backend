@@ -35,7 +35,8 @@ public enum ErrorCode {
     LOCKER_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "Locker is currently not active"),
     MOCK_IOT_DEVICE_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "Locker hardware error occurred"),
     ORDER_EXPIRED(HttpStatus.BAD_REQUEST, "Order has expired and can no longer be picked up"),
-    CANNOT_CLEAR_NON_EXPIRED_ORDER(HttpStatus.BAD_REQUEST, "Cannot clear an order that is not expired");
+    CANNOT_CLEAR_NON_EXPIRED_ORDER(HttpStatus.BAD_REQUEST, "Cannot clear an order that is not expired"),
+    AGE_RESTRICTION(HttpStatus.BAD_REQUEST, "Bạn phải từ đủ 13 tuổi trở lên để đăng ký tài khoản");
 
     private final HttpStatus status;
     private final String message;

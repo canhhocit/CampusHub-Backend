@@ -3,6 +3,7 @@ package com.campushub.modules.admin.dto;
 import com.campushub.common.enums.Role;
 import com.campushub.common.enums.UserStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class UserManagementResponse {
@@ -13,6 +14,7 @@ public class UserManagementResponse {
     private String fullName;
     private Role role;
     private UserStatus status;
+    private LocalDate dateOfBirth;
     private LocalDateTime createdAt;
     private LocalDateTime lastLogin;
     private long totalProducts;
@@ -31,6 +33,8 @@ public class UserManagementResponse {
     public void setRole(Role role) { this.role = role; }
     public UserStatus getStatus() { return status; }
     public void setStatus(UserStatus status) { this.status = status; }
+    public LocalDate getDateOfBirth() { return dateOfBirth; }
+    public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getLastLogin() { return lastLogin; }

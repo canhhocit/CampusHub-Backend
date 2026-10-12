@@ -5,6 +5,7 @@ package com.campushub.common.enums;
  * Each role carries a Spring Security authority string prefixed with "ROLE_".
  */
 public enum Role {
+    USER,
     STUDENT,
     ADMIN;
 

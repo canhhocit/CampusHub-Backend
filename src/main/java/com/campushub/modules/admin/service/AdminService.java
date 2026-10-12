@@ -202,6 +202,7 @@ public class AdminService {
         response.setFullName(user.getFullName());
         response.setRole(user.getRole());
         response.setStatus(user.getStatus());
+        response.setDateOfBirth(user.getDateOfBirth());
         response.setCreatedAt(user.getCreatedAt());
 
         // Count user's products and orders

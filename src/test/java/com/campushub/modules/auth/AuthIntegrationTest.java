@@ -59,6 +59,7 @@ public class AuthIntegrationTest {
         registerReq.setEmail("test@campushub.com");
         registerReq.setPassword("password123");
         registerReq.setFullName("Test User");
+        registerReq.setDateOfBirth(java.time.LocalDate.of(2000, 1, 1));
 
         mockMvc.perform(post("/api/v1/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -129,5 +130,20 @@ public class AuthIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/refresh").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                 .cookie(refreshTokenCookie))
                 .andExpect(status().isUnauthorized()); // TOKEN_REUSE_DETECTED
+    }
+
+    @Test
+    public void testRegistrationUnder13Fails() throws Exception {
+        RegisterRequest registerReq = new RegisterRequest();
+        registerReq.setUsername("kiduser");
+        registerReq.setEmail("kid@campushub.com");
+        registerReq.setPassword("password123");
+        registerReq.setFullName("Kid User");
+        registerReq.setDateOfBirth(java.time.LocalDate.now().minusYears(10)); // 10 years old < 13
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerReq)))
+                .andExpect(status().isBadRequest());
     }
 }
