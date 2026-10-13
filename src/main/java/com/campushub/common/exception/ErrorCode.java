@@ -40,7 +40,10 @@ public enum ErrorCode {
     IDENTITY_NOT_VERIFIED(HttpStatus.FORBIDDEN, "Bạn cần xác minh danh tính (CCCD) để thực hiện giao dịch này"),
     CITIZEN_ID_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Số CCCD này đã được sử dụng để xác minh một tài khoản khác"),
     INVALID_CITIZEN_ID(HttpStatus.BAD_REQUEST, "Số CCCD không hợp lệ (phải gồm đúng 12 chữ số)"),
-    ALREADY_IDENTITY_VERIFIED(HttpStatus.BAD_REQUEST, "Tài khoản của bạn đã được xác minh danh tính");
+    ALREADY_IDENTITY_VERIFIED(HttpStatus.BAD_REQUEST, "Tài khoản của bạn đã được xác minh danh tính"),
+    FILE_EMPTY(HttpStatus.BAD_REQUEST, "Vui lòng chọn file ảnh để tải lên"),
+    INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "Chỉ chấp nhận file định dạng hình ảnh (JPG, PNG, WEBP, GIF)"),
+    UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tải ảnh lên dịch vụ Cloudinary. Vui lòng thử lại sau.");
 
     private final HttpStatus status;
     private final String message;
