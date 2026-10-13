@@ -52,6 +52,8 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> 
                 auth.requestMatchers("/api/v1/auth/**").permitAll()
+                    .requestMatchers("/api/v1/ping", "/api/v1/health", "/ping", "/health").permitAll()
+                    .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/categories", "/api/v1/products", "/api/v1/products/*").permitAll()
                     .requestMatchers("/error").permitAll()
                     .anyRequest().authenticated()
