@@ -10,8 +10,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -41,28 +39,17 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        
-        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
-        // Set the name of the attribute the CsrfToken will be populated on
-        requestHandler.setCsrfRequestAttributeName("_csrf");
-        
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf
-                // Bật CSRF protection sử dụng cookie thay vì session
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .csrfTokenRequestHandler(requestHandler)
-                // Ignore CSRF cho các API không dùng cookie (đăng nhập, đăng ký, v.v)
-                .ignoringRequestMatchers(
-                        "/api/v1/auth/login",
-                        "/api/v1/auth/register",
-                        "/api/v1/auth/verify-email",
-                        "/api/v1/auth/forgot-password",
-                        "/api/v1/auth/reset-password",
-                        "/api/v1/auth/refresh" // Refresh endpoint uses cookie but it is safe because it only issues tokens
-                )
-            )
+            .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Yêu cầu đăng nhập hoặc phiên làm việc đã hết hạn\"}");
+                })
+            )
             .authorizeHttpRequests(auth -> 
                 auth.requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/categories", "/api/v1/products", "/api/v1/products/*").permitAll()
