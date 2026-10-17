@@ -34,7 +34,8 @@ spring:
             required: ${MAIL_STARTTLS_REQUIRED:false}
 
 server:
-  port: ${PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
+  address: 0.0.0.0
 
 app:
   mail:
