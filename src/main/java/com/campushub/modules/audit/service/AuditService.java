@@ -5,11 +5,13 @@ import com.campushub.modules.audit.entity.AuditAction;
 import com.campushub.modules.audit.entity.AuditEntityType;
 import com.campushub.modules.audit.entity.AuditLog;
 import com.campushub.modules.audit.repository.AuditLogRepository;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class AuditService {
@@ -143,7 +147,31 @@ public class AuditService {
             Long userId, AuditAction action, AuditEntityType entityType,
             Boolean success, LocalDateTime startDate, LocalDateTime endDate,
             Pageable pageable) {
-        return auditLogRepository.findWithFilters(userId, action, entityType, success, startDate, endDate, pageable)
+
+        Specification<AuditLog> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (userId != null) {
+                predicates.add(cb.equal(root.get("userId"), userId));
+            }
+            if (action != null) {
+                predicates.add(cb.equal(root.get("action"), action));
+            }
+            if (entityType != null) {
+                predicates.add(cb.equal(root.get("entityType"), entityType));
+            }
+            if (success != null) {
+                predicates.add(cb.equal(root.get("success"), success));
+            }
+            if (startDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), startDate));
+            }
+            if (endDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), endDate));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return auditLogRepository.findAll(spec, pageable)
                 .map(this::mapToResponse);
     }
 
