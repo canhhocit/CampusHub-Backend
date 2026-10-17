@@ -14,9 +14,9 @@ CREATE TABLE IF NOT EXISTS product_images (
 CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images(product_id);
 
 -- Seed System Settings for Media Limits
-INSERT INTO system_settings (key, value, description, updated_at) VALUES
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at) VALUES
 ('MAX_PRODUCT_IMAGES', '5', 'Số lượng ảnh mô tả tối đa cho mỗi sản phẩm', CURRENT_TIMESTAMP),
 ('MAX_PRODUCT_VIDEOS', '1', 'Số lượng video tối đa cho mỗi sản phẩm', CURRENT_TIMESTAMP),
 ('ALLOW_PRODUCT_VIDEO', 'true', 'Cho phép người bán upload video sản phẩm', CURRENT_TIMESTAMP),
 ('MAX_VIDEO_SIZE_MB', '50', 'Dung lượng tối đa của video sản phẩm (MB)', CURRENT_TIMESTAMP)
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (setting_key) DO NOTHING;
