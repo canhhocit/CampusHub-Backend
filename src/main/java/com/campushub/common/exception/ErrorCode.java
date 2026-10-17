@@ -43,7 +43,12 @@ public enum ErrorCode {
     ALREADY_IDENTITY_VERIFIED(HttpStatus.BAD_REQUEST, "Tài khoản của bạn đã được xác minh danh tính"),
     FILE_EMPTY(HttpStatus.BAD_REQUEST, "Vui lòng chọn file ảnh để tải lên"),
     INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "Chỉ chấp nhận file định dạng hình ảnh (JPG, PNG, WEBP, GIF)"),
-    UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tải ảnh lên dịch vụ Cloudinary. Vui lòng thử lại sau.");
+    UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tải file lên hệ thống lưu trữ. Vui lòng thử lại sau."),
+    MAX_IMAGES_EXCEEDED(HttpStatus.BAD_REQUEST, "Số lượng ảnh mô tả vượt quá giới hạn tối đa cho phép của hệ thống"),
+    VIDEO_UPLOAD_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Tính năng đăng video sản phẩm hiện đang tạm khóa bởi quản trị viên"),
+    MAX_VIDEOS_EXCEEDED(HttpStatus.BAD_REQUEST, "Số lượng video vượt quá giới hạn cho phép của hệ thống"),
+    INVALID_VIDEO_TYPE(HttpStatus.BAD_REQUEST, "Chỉ chấp nhận file video định dạng MP4, WEBM hoặc MOV"),
+    VIDEO_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "Dung lượng video vượt quá giới hạn tối đa cho phép");
 
     private final HttpStatus status;
     private final String message;

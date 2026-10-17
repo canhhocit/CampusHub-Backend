@@ -33,6 +33,12 @@ public class MarketplaceController {
         return ResponseEntity.ok(marketplaceService.getActiveCategories());
     }
 
+    @GetMapping("/marketplace/media-settings")
+    @Operation(summary = "Get product media settings for marketplace")
+    public ResponseEntity<com.campushub.modules.admin.dto.ProductMediaSettingsResponse> getMediaSettings() {
+        return ResponseEntity.ok(marketplaceService.getMediaConfig());
+    }
+
     @GetMapping("/categories/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<CategoryResponse>> getAllCategories() {

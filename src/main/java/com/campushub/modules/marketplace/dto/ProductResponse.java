@@ -15,11 +15,18 @@ public class ProductResponse {
     private com.campushub.modules.marketplace.entity.ListingType listingType = com.campushub.modules.marketplace.entity.ListingType.SALE;
     private BigDecimal rentPricePerDay;
     private BigDecimal depositAmount;
+    private String videoUrl;
+    private java.util.List<String> detailImageUrls = new java.util.ArrayList<>();
     private CategoryResponse category;
     private OwnerResponse owner;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Long version;
+
+    public String getVideoUrl() { return videoUrl; }
+    public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
+    public java.util.List<String> getDetailImageUrls() { return detailImageUrls; }
+    public void setDetailImageUrls(java.util.List<String> detailImageUrls) { this.detailImageUrls = detailImageUrls; }
 
     public static class OwnerResponse {
         private Long id;

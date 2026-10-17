@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class UploadValidationTest {
     // No provider should be contacted for a rejected file.
-    private final UploadService upload = new UploadService(null);
+    private final UploadService upload = new UploadService(null, null);
 
     @Test void rejectsSvgEvenIfItClaimsToBeAnImage() {
         var file = new MockMultipartFile("file", "active.svg", "image/svg+xml", "<svg><script>alert(1)</script></svg>".getBytes());

@@ -43,6 +43,19 @@ public class AdminController {
         return ResponseEntity.ok(systemSettingService.updateFeeConfig(request));
     }
 
+    @GetMapping("/settings/media")
+    @Operation(summary = "Get product media settings", description = "Get media limit settings for images and videos")
+    public ResponseEntity<com.campushub.modules.admin.dto.ProductMediaSettingsResponse> getMediaConfig() {
+        return ResponseEntity.ok(systemSettingService.getMediaConfig());
+    }
+
+    @PutMapping("/settings/media")
+    @Operation(summary = "Update product media settings", description = "Update media limit settings for images and videos")
+    public ResponseEntity<com.campushub.modules.admin.dto.ProductMediaSettingsResponse> updateMediaConfig(
+            @Valid @RequestBody com.campushub.modules.admin.dto.UpdateProductMediaSettingsRequest request) {
+        return ResponseEntity.ok(systemSettingService.updateMediaConfig(request));
+    }
+
     @PatchMapping("/users/{userId}/identity")
     public ResponseEntity<UserManagementResponse> reviewIdentity(@PathVariable Long userId,
             @Valid @RequestBody com.campushub.modules.admin.dto.IdentityReviewRequest request) {

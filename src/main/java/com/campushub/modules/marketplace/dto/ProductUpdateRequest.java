@@ -40,6 +40,17 @@ public class ProductUpdateRequest {
     @jakarta.validation.constraints.Digits(integer = 10, fraction = 2)
     private BigDecimal depositAmount;
 
+    @Size(max = 500)
+    @jakarta.validation.constraints.Pattern(regexp = "(?i)^https?://[^\\s]+$", message = "Video URL must use HTTP or HTTPS")
+    private String videoUrl;
+
+    private java.util.List<@Size(max = 500) String> detailImageUrls;
+
+    public String getVideoUrl() { return videoUrl; }
+    public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
+    public java.util.List<String> getDetailImageUrls() { return detailImageUrls; }
+    public void setDetailImageUrls(java.util.List<String> detailImageUrls) { this.detailImageUrls = detailImageUrls; }
+
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getDescription() { return description; }

@@ -25,15 +25,18 @@ public class MarketplaceService {
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
     private final com.campushub.modules.order.repository.OrderRepository orderRepository;
+    private final com.campushub.modules.admin.service.SystemSettingService systemSettingService;
 
     public MarketplaceService(ProductRepository productRepository, 
                               CategoryRepository categoryRepository, 
                               UserRepository userRepository,
-                              com.campushub.modules.order.repository.OrderRepository orderRepository) {
+                              com.campushub.modules.order.repository.OrderRepository orderRepository,
+                              com.campushub.modules.admin.service.SystemSettingService systemSettingService) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.userRepository = userRepository;
         this.orderRepository = orderRepository;
+        this.systemSettingService = systemSettingService;
     }
 
     private CategoryResponse mapCategory(Category category) {
@@ -51,6 +54,12 @@ public class MarketplaceService {
         res.setListingType(product.getListingType());
         res.setRentPricePerDay(product.getRentPricePerDay());
         res.setDepositAmount(product.getDepositAmount());
+        res.setVideoUrl(product.getVideoUrl());
+        if (product.getDetailImages() != null && !product.getDetailImages().isEmpty()) {
+            res.setDetailImageUrls(product.getDetailImages().stream()
+                    .map(com.campushub.modules.marketplace.entity.ProductImage::getImageUrl)
+                    .collect(Collectors.toList()));
+        }
         res.setCategory(mapCategory(product.getCategory()));
         res.setOwner(new ProductResponse.OwnerResponse(
                 product.getOwner().getId(),
@@ -131,6 +140,23 @@ public class MarketplaceService {
                 .map(this::mapProduct);
     }
 
+    private void validateMediaLimits(java.util.List<String> detailImageUrls, String videoUrl) {
+        com.campushub.modules.admin.dto.ProductMediaSettingsResponse mediaConfig = systemSettingService.getMediaConfig();
+        if (detailImageUrls != null && detailImageUrls.size() > mediaConfig.getMaxProductImages()) {
+            throw new AppException(ErrorCode.MAX_IMAGES_EXCEEDED);
+        }
+        if (videoUrl != null && !videoUrl.isBlank()) {
+            if (!Boolean.TRUE.equals(mediaConfig.getAllowProductVideo())) {
+                throw new AppException(ErrorCode.VIDEO_UPLOAD_NOT_ALLOWED);
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public com.campushub.modules.admin.dto.ProductMediaSettingsResponse getMediaConfig() {
+        return systemSettingService.getMediaConfig();
+    }
+
     @Transactional
     public ProductResponse createProduct(ProductCreateRequest request, String username) {
         User user = userRepository.findByUsername(username)
@@ -143,11 +169,14 @@ public class MarketplaceService {
         Category category = categoryRepository.findByIdAndIsActiveTrue(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
+        validateMediaLimits(request.getDetailImageUrls(), request.getVideoUrl());
+
         Product product = new Product();
         product.setTitle(request.getTitle());
         product.setDescription(request.getDescription());
         product.setPrice(request.getPrice());
         product.setImageUrl(request.getImageUrl());
+        product.setVideoUrl(request.getVideoUrl());
         product.setCategory(category);
         product.setOwner(user);
         product.setStatus(ProductStatus.ACTIVE);
@@ -156,6 +185,15 @@ public class MarketplaceService {
         }
         product.setRentPricePerDay(request.getRentPricePerDay());
         product.setDepositAmount(request.getDepositAmount());
+
+        if (request.getDetailImageUrls() != null) {
+            for (int i = 0; i < request.getDetailImageUrls().size(); i++) {
+                String imgUrl = request.getDetailImageUrls().get(i);
+                if (imgUrl != null && !imgUrl.isBlank()) {
+                    product.addDetailImage(new com.campushub.modules.marketplace.entity.ProductImage(product, imgUrl.trim(), i));
+                }
+            }
+        }
 
         product = productRepository.save(product);
         return mapProduct(product);
@@ -178,16 +216,29 @@ public class MarketplaceService {
         Category category = categoryRepository.findByIdAndIsActiveTrue(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
+        validateMediaLimits(request.getDetailImageUrls(), request.getVideoUrl());
+
         product.setTitle(request.getTitle());
         product.setDescription(request.getDescription());
         product.setPrice(request.getPrice());
         product.setImageUrl(request.getImageUrl());
+        product.setVideoUrl(request.getVideoUrl());
         product.setCategory(category);
         if (request.getListingType() != null) {
             product.setListingType(request.getListingType());
         }
         product.setRentPricePerDay(request.getRentPricePerDay());
         product.setDepositAmount(request.getDepositAmount());
+
+        if (request.getDetailImageUrls() != null) {
+            product.clearDetailImages();
+            for (int i = 0; i < request.getDetailImageUrls().size(); i++) {
+                String imgUrl = request.getDetailImageUrls().get(i);
+                if (imgUrl != null && !imgUrl.isBlank()) {
+                    product.addDetailImage(new com.campushub.modules.marketplace.entity.ProductImage(product, imgUrl.trim(), i));
+                }
+            }
+        }
 
         product = productRepository.saveAndFlush(product);
         return mapProduct(product);

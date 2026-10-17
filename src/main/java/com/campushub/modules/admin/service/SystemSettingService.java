@@ -19,6 +19,10 @@ public class SystemSettingService {
     public static final String KEY_SALE_COMMISSION_PERCENT = "SALE_COMMISSION_PERCENT";
     public static final String KEY_RENTAL_FEE_MODE = "RENTAL_FEE_MODE";
     public static final String KEY_RENTAL_FEE_VALUE = "RENTAL_FEE_VALUE";
+    public static final String KEY_MAX_PRODUCT_IMAGES = "MAX_PRODUCT_IMAGES";
+    public static final String KEY_MAX_PRODUCT_VIDEOS = "MAX_PRODUCT_VIDEOS";
+    public static final String KEY_ALLOW_PRODUCT_VIDEO = "ALLOW_PRODUCT_VIDEO";
+    public static final String KEY_MAX_VIDEO_SIZE_MB = "MAX_VIDEO_SIZE_MB";
 
     private final SystemSettingRepository systemSettingRepository;
 
@@ -43,6 +47,26 @@ public class SystemSettingService {
         saveSetting(KEY_RENTAL_FEE_VALUE, request.getRentalFeeValue().stripTrailingZeros().toPlainString(), "Giá trị phí thuê");
 
         return getFeeConfig();
+    }
+
+    @Transactional(readOnly = true)
+    public com.campushub.modules.admin.dto.ProductMediaSettingsResponse getMediaConfig() {
+        int maxImages = Integer.parseInt(getSettingValue(KEY_MAX_PRODUCT_IMAGES, "5"));
+        int maxVideos = Integer.parseInt(getSettingValue(KEY_MAX_PRODUCT_VIDEOS, "1"));
+        boolean allowVideo = Boolean.parseBoolean(getSettingValue(KEY_ALLOW_PRODUCT_VIDEO, "true"));
+        int maxVideoSizeMb = Integer.parseInt(getSettingValue(KEY_MAX_VIDEO_SIZE_MB, "50"));
+
+        return new com.campushub.modules.admin.dto.ProductMediaSettingsResponse(maxImages, maxVideos, allowVideo, maxVideoSizeMb);
+    }
+
+    @Transactional
+    public com.campushub.modules.admin.dto.ProductMediaSettingsResponse updateMediaConfig(com.campushub.modules.admin.dto.UpdateProductMediaSettingsRequest request) {
+        saveSetting(KEY_MAX_PRODUCT_IMAGES, String.valueOf(request.getMaxProductImages()), "Số lượng ảnh mô tả tối đa cho mỗi sản phẩm");
+        saveSetting(KEY_MAX_PRODUCT_VIDEOS, String.valueOf(request.getMaxProductVideos()), "Số lượng video tối đa cho mỗi sản phẩm");
+        saveSetting(KEY_ALLOW_PRODUCT_VIDEO, String.valueOf(request.getAllowProductVideo()), "Cho phép người bán upload video sản phẩm");
+        saveSetting(KEY_MAX_VIDEO_SIZE_MB, String.valueOf(request.getMaxVideoSizeMb()), "Dung lượng tối đa của video sản phẩm (MB)");
+
+        return getMediaConfig();
     }
 
     public record FeeCalculation(

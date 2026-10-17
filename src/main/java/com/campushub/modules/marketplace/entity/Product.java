@@ -36,6 +36,13 @@ public class Product extends BaseEntity {
     @Column(name = "deposit_amount", precision = 12, scale = 2)
     private BigDecimal depositAmount;
 
+    @Column(name = "video_url", length = 500)
+    private String videoUrl;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
+    private java.util.List<ProductImage> detailImages = new java.util.ArrayList<>();
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -49,6 +56,30 @@ public class Product extends BaseEntity {
     private Long version = 0L;
 
     // Getters and Setters
+    public String getVideoUrl() {
+        return videoUrl;
+    }
+
+    public void setVideoUrl(String videoUrl) {
+        this.videoUrl = videoUrl;
+    }
+
+    public java.util.List<ProductImage> getDetailImages() {
+        return detailImages;
+    }
+
+    public void setDetailImages(java.util.List<ProductImage> detailImages) {
+        this.detailImages = detailImages;
+    }
+
+    public void addDetailImage(ProductImage image) {
+        detailImages.add(image);
+        image.setProduct(this);
+    }
+
+    public void clearDetailImages() {
+        detailImages.clear();
+    }
     public String getTitle() {
         return title;
     }
