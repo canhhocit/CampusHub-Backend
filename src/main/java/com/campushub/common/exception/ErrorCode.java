@@ -48,7 +48,10 @@ public enum ErrorCode {
     VIDEO_UPLOAD_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Tính năng đăng video sản phẩm hiện đang tạm khóa bởi quản trị viên"),
     MAX_VIDEOS_EXCEEDED(HttpStatus.BAD_REQUEST, "Số lượng video vượt quá giới hạn cho phép của hệ thống"),
     INVALID_VIDEO_TYPE(HttpStatus.BAD_REQUEST, "Chỉ chấp nhận file video định dạng MP4, WEBM hoặc MOV"),
-    VIDEO_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "Dung lượng video vượt quá giới hạn tối đa cho phép");
+    VIDEO_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "Dung lượng video vượt quá giới hạn tối đa cho phép"),
+    ORDER_ALREADY_PAID(HttpStatus.BAD_REQUEST, "Đơn hàng này đã được thanh toán"),
+    INVALID_PAYMENT_STATUS(HttpStatus.BAD_REQUEST, "Trạng thái thanh toán không hợp lệ"),
+    PAYMENT_FAILED(HttpStatus.BAD_REQUEST, "Giao dịch thanh toán không thành công");
 
     private final HttpStatus status;
     private final String message;

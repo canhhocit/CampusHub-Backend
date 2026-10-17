@@ -60,6 +60,12 @@ app:
     cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     api-key: ${CLOUDINARY_API_KEY:}
     api-secret: ${CLOUDINARY_API_SECRET:}
+  payos:
+    client-id: ${PAYOS_CLIENT_ID:}
+    api-key: ${PAYOS_API_KEY:}
+    checksum-key: ${PAYOS_CHECKSUM_KEY:}
+    return-url: ${PAYOS_RETURN_URL:http://localhost:5173/orders}
+    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/orders}
   ping:
     enabled: ${SELF_PING_ENABLED:true}
     url: ${SELF_PING_URL:${RENDER_EXTERNAL_URL:}}

@@ -55,6 +55,26 @@ public class Order extends BaseEntity {
     @Column(name = "seller_payout", nullable = false, precision = 12, scale = 2)
     private BigDecimal sellerPayout = BigDecimal.ZERO;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 30)
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 30)
+    private PaymentMethod paymentMethod;
+
+    @Column(name = "payos_order_code", unique = true)
+    private Long payosOrderCode;
+
+    @Column(name = "payos_payment_link_id", length = 100)
+    private String payosPaymentLinkId;
+
+    @Column(name = "payment_paid_at")
+    private LocalDateTime paymentPaidAt;
+
+    @Column(name = "refunded_at")
+    private LocalDateTime refundedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "locker_id")
     private Locker locker;
@@ -340,5 +360,58 @@ public class Order extends BaseEntity {
 
     public void setReturnPickedUpAt(LocalDateTime returnPickedUpAt) {
         this.returnPickedUpAt = returnPickedUpAt;
+    }
+
+    public PaymentStatus getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(PaymentStatus paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public Long getPayosOrderCode() {
+        return payosOrderCode;
+    }
+
+    public void setPayosOrderCode(Long payosOrderCode) {
+        this.payosOrderCode = payosOrderCode;
+    }
+
+    public String getPayosPaymentLinkId() {
+        return payosPaymentLinkId;
+    }
+
+    public void setPayosPaymentLinkId(String payosPaymentLinkId) {
+        this.payosPaymentLinkId = payosPaymentLinkId;
+    }
+
+    public LocalDateTime getPaymentPaidAt() {
+        return paymentPaidAt;
+    }
+
+    public void setPaymentPaidAt(LocalDateTime paymentPaidAt) {
+        this.paymentPaidAt = paymentPaidAt;
+    }
+
+    public LocalDateTime getRefundedAt() {
+        return refundedAt;
+    }
+
+    public void setRefundedAt(LocalDateTime refundedAt) {
+        this.refundedAt = refundedAt;
+    }
+
+    public BigDecimal getTotalAmount() {
+        return (priceSnapshot != null ? priceSnapshot : BigDecimal.ZERO)
+                .add(depositAmount != null ? depositAmount : BigDecimal.ZERO);
     }
 }

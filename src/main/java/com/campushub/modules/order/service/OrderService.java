@@ -140,6 +140,12 @@ public class OrderService {
                 .add(order.getDepositAmount() != null ? order.getDepositAmount() : java.math.BigDecimal.ZERO);
         res.setTotalAmount(total1);
 
+        res.setPaymentStatus(order.getPaymentStatus());
+        res.setPaymentMethod(order.getPaymentMethod());
+        res.setPayosOrderCode(order.getPayosOrderCode());
+        res.setPaymentPaidAt(order.getPaymentPaidAt());
+        res.setRefundedAt(order.getRefundedAt());
+
         res.setCreatedAt(order.getCreatedAt());
         res.setUpdatedAt(order.getUpdatedAt());
         return res;

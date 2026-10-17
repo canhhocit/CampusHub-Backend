@@ -2,6 +2,8 @@ package com.campushub.modules.order.dto;
 
 import com.campushub.modules.order.entity.OrderStatus;
 import com.campushub.modules.order.entity.OrderType;
+import com.campushub.modules.order.entity.PaymentStatus;
+import com.campushub.modules.order.entity.PaymentMethod;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -22,6 +24,14 @@ public class OrderResponse {
     private BigDecimal platformFee;
     private BigDecimal sellerPayout;
     private BigDecimal totalAmount;
+
+    private PaymentStatus paymentStatus;
+    private PaymentMethod paymentMethod;
+    private Long payosOrderCode;
+    private LocalDateTime paymentPaidAt;
+    private LocalDateTime refundedAt;
+    private String checkoutUrl;
+    private String qrCode;
 
     private Long buyerId;
     private String buyerUsername;
@@ -301,5 +311,61 @@ public class OrderResponse {
 
     public void setReturnCompartmentCode(String returnCompartmentCode) {
         this.returnCompartmentCode = returnCompartmentCode;
+    }
+
+    public PaymentStatus getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(PaymentStatus paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public Long getPayosOrderCode() {
+        return payosOrderCode;
+    }
+
+    public void setPayosOrderCode(Long payosOrderCode) {
+        this.payosOrderCode = payosOrderCode;
+    }
+
+    public LocalDateTime getPaymentPaidAt() {
+        return paymentPaidAt;
+    }
+
+    public void setPaymentPaidAt(LocalDateTime paymentPaidAt) {
+        this.paymentPaidAt = paymentPaidAt;
+    }
+
+    public LocalDateTime getRefundedAt() {
+        return refundedAt;
+    }
+
+    public void setRefundedAt(LocalDateTime refundedAt) {
+        this.refundedAt = refundedAt;
+    }
+
+    public String getCheckoutUrl() {
+        return checkoutUrl;
+    }
+
+    public void setCheckoutUrl(String checkoutUrl) {
+        this.checkoutUrl = checkoutUrl;
+    }
+
+    public String getQrCode() {
+        return qrCode;
+    }
+
+    public void setQrCode(String qrCode) {
+        this.qrCode = qrCode;
     }
 }

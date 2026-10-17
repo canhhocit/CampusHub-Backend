@@ -26,6 +26,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByOrderNumber(String orderNumber);
 
+    Optional<Order> findByPayosOrderCode(Long payosOrderCode);
+
     Page<Order> findByBuyerId(Long buyerId, Pageable pageable);
 
     Page<Order> findBySellerId(Long sellerId, Pageable pageable);
