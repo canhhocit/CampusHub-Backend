@@ -18,11 +18,10 @@ public class OrderAttemptService {
     }
 
     /**
-     * Record a failed pickup attempt in an independent, committed transaction.
-     * This ensures that when an invalid PIN exception rolls back the caller transaction,
-     * the incremented attempt count is retained and committed in the database immediately.
+     * Called only within pickup's locked transaction. Never suspend the transaction
+     * holding this row's lock to update the same row on another connection.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.MANDATORY)
     public int recordFailedPickupAttempt(Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));

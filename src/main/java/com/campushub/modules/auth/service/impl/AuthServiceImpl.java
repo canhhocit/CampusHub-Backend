@@ -46,9 +46,13 @@ public class AuthServiceImpl implements AuthService {
     private final JwtProvider jwtProvider;
     private final EmailService emailService;
     private final CacheManager cacheManager;
+    private final com.campushub.modules.audit.service.AuditService auditService;
 
     @Value("${app.jwt.refresh-expiration}")
     private long refreshExpirationMs;
+
+    @Value("${app.jwt.cookie-secure:false}")
+    private boolean cookieSecure;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -59,7 +63,8 @@ public class AuthServiceImpl implements AuthService {
                            PasswordEncoder passwordEncoder,
                            JwtProvider jwtProvider,
                            EmailService emailService,
-                           CacheManager cacheManager) {
+                           CacheManager cacheManager,
+                           com.campushub.modules.audit.service.AuditService auditService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.verificationTokenRepository = verificationTokenRepository;
@@ -67,6 +72,7 @@ public class AuthServiceImpl implements AuthService {
         this.jwtProvider = jwtProvider;
         this.emailService = emailService;
         this.cacheManager = cacheManager;
+        this.auditService = auditService;
     }
 
     private void checkRateLimit(String cacheName, String key, int maxRequests) {
@@ -76,7 +82,7 @@ public class AuthServiceImpl implements AuthService {
             Cache.ValueWrapper wrapper = cache.get(key);
             AtomicInteger count;
             if (wrapper == null) {
-                AtomicInteger newCounter = new AtomicInteger(1);
+                AtomicInteger newCounter = new AtomicInteger(0);
                 Cache.ValueWrapper existing = cache.putIfAbsent(key, newCounter);
                 count = (existing == null) ? newCounter : (AtomicInteger) existing.get();
             } else {
@@ -89,10 +95,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (!StringUtils.hasText(ip)) {
-            ip = request.getRemoteAddr();
-        }
+        String ip = request.getRemoteAddr();
         return ip != null ? ip : "unknown";
     }
 
@@ -149,14 +152,17 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public void verifyEmail(VerifyEmailRequest request) {
         String hashed = hashToken(request.getToken());
-        VerificationToken vt = verificationTokenRepository.findByTokenHashAndType(hashed, TokenType.EMAIL_VERIFY)
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
+        VerificationToken vt = lockVerificationToken(hashed, TokenType.EMAIL_VERIFY);
 
         if (vt.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
 
-        User user = vt.getUser();
+        User user = userRepository.findByIdWithLock(vt.getUser().getId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (user.getStatus() != UserStatus.PENDING) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
         user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
 
@@ -166,6 +172,19 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public TokenResponse login(LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        try {
+            TokenResponse response = authenticate(request, httpRequest, httpResponse);
+            auditService.logWithUsername(com.campushub.modules.audit.entity.AuditAction.USER_LOGIN,
+                    request.getUsernameOrEmail(), true, null);
+            return response;
+        } catch (AppException ex) {
+            auditService.logWithUsername(com.campushub.modules.audit.entity.AuditAction.USER_LOGIN,
+                    request.getUsernameOrEmail(), false, ex.getErrorCode().name());
+            throw ex;
+        }
+    }
+
+    private TokenResponse authenticate(LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         checkRateLimit("rateLimitLogin", getClientIp(httpRequest), 10);
 
         User user = userRepository.findByUsernameOrEmail(request.getUsernameOrEmail(), request.getUsernameOrEmail())
@@ -200,7 +219,7 @@ public class AuthServiceImpl implements AuthService {
 
         ResponseCookie cookie = ResponseCookie.from("refresh_token", rawToken)
                 .httpOnly(true)
-                .secure(false) // set to true in production if HTTPS
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(refreshExpirationMs / 1000)
                 .sameSite("Lax")
@@ -209,7 +228,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = AppException.class)
     public TokenResponse refreshToken(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         String token = getRefreshTokenFromCookies(httpRequest);
         if (token == null) {
@@ -264,7 +283,7 @@ public class AuthServiceImpl implements AuthService {
 
         ResponseCookie cookie = ResponseCookie.from("refresh_token", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Lax")
@@ -283,7 +302,8 @@ public class AuthServiceImpl implements AuthService {
             return;
         }
 
-        User user = userOpt.get();
+        User user = userRepository.findByIdWithLock(userOpt.get().getId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         verificationTokenRepository.deleteByUserAndType(user, TokenType.PASSWORD_RESET);
 
         String rawToken = UUID.randomUUID().toString();
@@ -302,19 +322,30 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         String hashed = hashToken(request.getToken());
-        VerificationToken vt = verificationTokenRepository.findByTokenHashAndType(hashed, TokenType.PASSWORD_RESET)
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
+        VerificationToken vt = lockVerificationToken(hashed, TokenType.PASSWORD_RESET);
 
         if (vt.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
 
-        User user = vt.getUser();
+        User user = userRepository.findByIdWithLock(vt.getUser().getId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
         verificationTokenRepository.deleteByUserAndType(user, TokenType.PASSWORD_RESET);
         refreshTokenRepository.revokeAllUserTokens(user);
+    }
+
+    private VerificationToken lockVerificationToken(String hash, TokenType type) {
+        VerificationToken candidate = verificationTokenRepository.findByTokenHashAndType(hash, type)
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
+        // Every verification/reset mutation locks the user before token rows.
+        // Re-read after waiting: another request may have consumed/deleted the token.
+        userRepository.findByIdWithLock(candidate.getUser().getId())
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
+        return verificationTokenRepository.findByTokenHashAndTypeWithLock(hash, type)
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
     }
 
     private String getRefreshTokenFromCookies(HttpServletRequest request) {

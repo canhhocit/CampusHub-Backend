@@ -88,9 +88,9 @@ public class AuthController {
         response.put("username", authentication.getName());
         response.put("authorities", authentication.getAuthorities());
         userRepository.findByUsername(authentication.getName()).ifPresent(u -> {
-            boolean isVerified = u.getRole() == com.campushub.common.enums.Role.ADMIN 
-                    || Boolean.TRUE.equals(u.getIdentityVerified());
+            boolean isVerified = u.isIdentityApproved();
             response.put("identityVerified", isVerified);
+            response.put("identityReviewStatus", u.getIdentityReviewStatus());
             response.put("fullName", u.getFullName());
             response.put("email", u.getEmail());
             response.put("citizenId", u.getCitizenId());

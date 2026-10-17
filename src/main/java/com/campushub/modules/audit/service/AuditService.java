@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -32,10 +31,9 @@ public class AuditService {
     }
 
     /**
-     * Log audit entry asynchronously
+     * Log audit entry while caller security/request context is available
      */
-    @Async
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void log(AuditAction action, AuditEntityType entityType, Long entityId, String details) {
         try {
             AuditLog log = new AuditLog();
@@ -55,8 +53,7 @@ public class AuditService {
     /**
      * Log audit entry with explicit success status
      */
-    @Async
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void log(AuditAction action, AuditEntityType entityType, Long entityId, 
                     String details, boolean success, String errorMessage) {
         try {
@@ -78,15 +75,14 @@ public class AuditService {
     /**
      * Log audit entry with username override (for login events)
      */
-    @Async
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void logWithUsername(AuditAction action, String username, 
                                 boolean success, String errorMessage) {
         try {
             AuditLog log = new AuditLog();
             log.setAction(action);
             log.setEntityType(AuditEntityType.USER);
-            log.setUsername(username);
+            log.setUsername(username == null ? null : username.substring(0, Math.min(username.length(), 50)));
             log.setSuccess(success);
             log.setErrorMessage(errorMessage);
 
@@ -106,7 +102,9 @@ public class AuditService {
         if (authentication != null && authentication.isAuthenticated() 
                 && !(authentication.getPrincipal() instanceof String && authentication.getPrincipal().equals("anonymousUser"))) {
             log.setUsername(authentication.getName());
-            // Note: userId would need to be fetched from UserRepository if needed
+            if (authentication.getPrincipal() instanceof com.campushub.common.security.UserPrincipal principal) {
+                log.setUserId(principal.getId());
+            }
         }
 
         enrichWithRequest(log);
@@ -121,7 +119,8 @@ public class AuditService {
             if (attributes != null) {
                 HttpServletRequest request = attributes.getRequest();
                 log.setIpAddress(getClientIp(request));
-                log.setUserAgent(request.getHeader("User-Agent"));
+                String agent = request.getHeader("User-Agent");
+                log.setUserAgent(agent == null ? null : agent.substring(0, Math.min(agent.length(), 500)));
             }
         } catch (Exception e) {
             logger.debug("Could not enrich audit log with request context: {}", e.getMessage());
@@ -132,16 +131,7 @@ public class AuditService {
      * Get client IP address from request
      */
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
+        String ip = request.getRemoteAddr();
         return ip;
     }
 
@@ -179,8 +169,8 @@ public class AuditService {
      * Get statistics
      */
     @Transactional(readOnly = true)
-    public long countActionSince(AuditAction action, LocalDateTime since) {
-        return auditLogRepository.countByActionSince(action, since);
+    public long countFailedActionSince(AuditAction action, LocalDateTime since) {
+        return auditLogRepository.countFailedByActionSince(action, since);
     }
 
     @Transactional(readOnly = true)

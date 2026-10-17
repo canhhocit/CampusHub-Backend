@@ -5,6 +5,10 @@ import com.campushub.common.enums.UserStatus;
 import java.time.LocalDateTime;
 
 public class UserProfileResponse {
+    private String identityReviewStatus;
+    public String getIdentityReviewStatus() { return identityReviewStatus; }
+    public void setIdentityReviewStatus(String value) { identityReviewStatus = value; }
+
 
     private Long id;
     private String username;

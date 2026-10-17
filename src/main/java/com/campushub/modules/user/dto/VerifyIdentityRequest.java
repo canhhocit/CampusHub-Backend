@@ -10,8 +10,12 @@ public class VerifyIdentityRequest {
     private String citizenId;
 
     @NotBlank(message = "Ảnh mặt trước CCCD không được để trống")
+    @jakarta.validation.constraints.Size(max = 500)
+    @Pattern(regexp = "(?i)^https?://[^\\s]+$", message = "Image URL must use HTTP or HTTPS")
     private String idCardFrontUrl;
 
+    @jakarta.validation.constraints.Size(max = 500)
+    @Pattern(regexp = "(?i)^https?://[^\\s]+$", message = "Image URL must use HTTP or HTTPS")
     private String idCardBackUrl;
 
     public String getCitizenId() {

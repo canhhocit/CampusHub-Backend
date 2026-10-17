@@ -14,6 +14,10 @@ import java.util.Optional;
 @Repository
 public interface LockerRepository extends JpaRepository<Locker, Long> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM Locker l WHERE l.id = :id")
+    Optional<Locker> findByIdWithLock(@Param("id") Long id);
+
     boolean existsByCode(String code);
 
     Optional<Locker> findByCode(String code);

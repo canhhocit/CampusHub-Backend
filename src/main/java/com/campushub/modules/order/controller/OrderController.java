@@ -42,7 +42,7 @@ public class OrderController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         if (size > 50) size = 50;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ResponseEntity.ok(orderService.getBuyingOrders(authentication.getName(), pageable));
     }
 
@@ -53,7 +53,7 @@ public class OrderController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         if (size > 50) size = 50;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ResponseEntity.ok(orderService.getSellingOrders(authentication.getName(), pageable));
     }
 
@@ -69,7 +69,7 @@ public class OrderController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<OrderResponse> acceptOrder(
             @PathVariable Long id,
-            @RequestBody(required = false) OrderAcceptRequest request,
+            @Valid @RequestBody(required = false) OrderAcceptRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(orderService.acceptOrder(id, request, authentication.getName()));
     }
@@ -78,7 +78,7 @@ public class OrderController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<OrderResponse> rejectOrder(
             @PathVariable Long id,
-            @RequestBody(required = false) OrderRejectRequest request,
+            @Valid @RequestBody(required = false) OrderRejectRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(orderService.rejectOrder(id, request, authentication.getName()));
     }

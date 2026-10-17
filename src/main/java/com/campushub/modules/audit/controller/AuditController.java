@@ -43,7 +43,7 @@ public class AuditController {
 
         if (size > 100) size = 100;
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<AuditLogResponse> logs = auditService.findWithFilters(
                 userId, action, entityType, success, startDate, endDate, pageable);
 
@@ -58,7 +58,7 @@ public class AuditController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<AuditLogResponse> logs = auditService.findByEntity(entityType, entityId, pageable);
 
         return ResponseEntity.ok(logs);
@@ -71,7 +71,7 @@ public class AuditController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<AuditLogResponse> logs = auditService.findByUser(userId, pageable);
 
         return ResponseEntity.ok(logs);

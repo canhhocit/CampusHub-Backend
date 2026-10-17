@@ -69,11 +69,12 @@ public class MarketplaceController {
             @RequestParam(defaultValue = "createdAt") String sort,
             @RequestParam(defaultValue = "desc") String direction) {
         
+        com.campushub.common.model.PageRequests.validateSort(sort, direction, java.util.Set.of("price", "createdAt"));
         if (size > 50) size = 50;
         
         Sort.Direction dir = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         String sortProp = sort.equals("price") ? "price" : "createdAt";
-        Pageable pageable = PageRequest.of(page, size, Sort.by(dir, sortProp));
+        Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(dir, sortProp));
         
         return ResponseEntity.ok(marketplaceService.getPublicProducts(categoryId, search, pageable));
     }
@@ -91,13 +92,14 @@ public class MarketplaceController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<ProductResponse>> getMyProducts(
             Authentication authentication,
+            @RequestParam(required = false) com.campushub.modules.marketplace.entity.ProductStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
         if (size > 50) size = 50;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
+        Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
         
-        return ResponseEntity.ok(marketplaceService.getMyProducts(authentication.getName(), pageable));
+        return ResponseEntity.ok(marketplaceService.getMyProducts(authentication.getName(), status, pageable));
     }
 
     @PostMapping("/products")

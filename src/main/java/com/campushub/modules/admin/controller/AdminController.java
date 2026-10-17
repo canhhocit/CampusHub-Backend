@@ -28,6 +28,12 @@ public class AdminController {
         this.adminService = adminService;
     }
 
+    @PatchMapping("/users/{userId}/identity")
+    public ResponseEntity<UserManagementResponse> reviewIdentity(@PathVariable Long userId,
+            @Valid @RequestBody com.campushub.modules.admin.dto.IdentityReviewRequest request) {
+        return ResponseEntity.ok(adminService.reviewIdentity(userId, request.approved()));
+    }
+
     @GetMapping("/dashboard")
     @Operation(summary = "Get dashboard statistics", 
                description = "Get comprehensive dashboard statistics for admin panel")
@@ -46,10 +52,11 @@ public class AdminController {
             @RequestParam(defaultValue = "createdAt") String sort,
             @RequestParam(defaultValue = "desc") String direction) {
 
+        com.campushub.common.model.PageRequests.validateSort(sort, direction, java.util.Set.of("createdAt", "username", "fullName", "email", "status"));
         if (size > 100) size = 100;
 
         Sort.Direction dir = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(dir, sort));
+        Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(dir, sort));
 
         Page<UserManagementResponse> users = adminService.getAllUsers(search, status, pageable);
         return ResponseEntity.ok(users);

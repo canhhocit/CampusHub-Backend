@@ -156,10 +156,10 @@ public class AdminService {
         LocalDateTime weekAgo = today.minusDays(7);
 
         // Get failed login attempts from audit logs
-        long failedLoginsToday = auditService.countActionSince(AuditAction.USER_LOGIN, today);
-        long failedLoginsThisWeek = auditService.countActionSince(AuditAction.USER_LOGIN, weekAgo);
+        long failedLoginsToday = auditService.countFailedActionSince(AuditAction.USER_LOGIN, today);
+        long failedLoginsThisWeek = auditService.countFailedActionSince(AuditAction.USER_LOGIN, weekAgo);
 
-        long failedPickupsToday = auditService.countActionSince(AuditAction.ORDER_PICKUP_FAILED, today);
+        long failedPickupsToday = auditService.countFailedActionSince(AuditAction.ORDER_PICKUP_FAILED, today);
 
         stats.setFailedLoginsToday(failedLoginsToday);
         stats.setFailedLoginsThisWeek(failedLoginsThisWeek);
@@ -182,8 +182,12 @@ public class AdminService {
 
     @Transactional
     public UserManagementResponse updateUserStatus(Long userId, UserStatus newStatus, String reason) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdWithLock(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.getRole() == com.campushub.common.enums.Role.ADMIN) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
 
         UserStatus oldStatus = user.getStatus();
         user.setStatus(newStatus);
@@ -197,6 +201,22 @@ public class AdminService {
         return mapToUserManagementResponse(user);
     }
 
+    @Transactional
+    public UserManagementResponse reviewIdentity(Long userId, boolean approved) {
+        User user = userRepository.findByIdWithLock(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (user.getCitizenId() == null || user.getIdCardFrontUrl() == null) {
+            throw new AppException(ErrorCode.INVALID_CITIZEN_ID);
+        }
+        user.setIdentityVerified(approved);
+        user.setIdentityVerifiedAt(approved ? LocalDateTime.now() : null);
+        user.setIdentityReviewedAt(LocalDateTime.now());
+        userRepository.save(user);
+        auditService.log(AuditAction.USER_IDENTITY_REVIEW, AuditEntityType.USER, userId,
+                approved ? "Identity approved after manual review" : "Identity verification rejected/revoked");
+        return mapToUserManagementResponse(user);
+    }
+
     private UserManagementResponse mapToUserManagementResponse(User user) {
         UserManagementResponse response = new UserManagementResponse();
         response.setId(user.getId());
@@ -206,9 +226,9 @@ public class AdminService {
         response.setRole(user.getRole());
         response.setStatus(user.getStatus());
         response.setDateOfBirth(user.getDateOfBirth());
-        boolean isVerified = user.getRole() == com.campushub.common.enums.Role.ADMIN 
-                || Boolean.TRUE.equals(user.getIdentityVerified());
+        boolean isVerified = user.isIdentityApproved();
         response.setIdentityVerified(isVerified);
+        response.setIdentityReviewStatus(user.getIdentityReviewStatus());
         response.setCitizenId(user.getCitizenId());
         response.setIdCardFrontUrl(user.getIdCardFrontUrl());
         response.setIdCardBackUrl(user.getIdCardBackUrl());

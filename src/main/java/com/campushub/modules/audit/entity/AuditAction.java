@@ -8,6 +8,7 @@ public enum AuditAction {
     USER_PROFILE_UPDATE,
     USER_PASSWORD_CHANGE,
     USER_STATUS_CHANGE,
+    USER_IDENTITY_REVIEW,
 
     // Product actions
     PRODUCT_CREATE,

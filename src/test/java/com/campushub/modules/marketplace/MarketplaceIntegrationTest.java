@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.springframework.test.context.ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -71,6 +72,7 @@ public class MarketplaceIntegrationTest {
         testUser.setFullName("Seller One");
         testUser.setRole(Role.STUDENT);
         testUser.setStatus(UserStatus.ACTIVE);
+        testUser.setIdentityVerified(true); testUser.setIdentityReviewedAt(java.time.LocalDateTime.now());
         testUser = userRepository.save(testUser);
 
         otherUser = new User();
@@ -80,6 +82,7 @@ public class MarketplaceIntegrationTest {
         otherUser.setFullName("Seller Two");
         otherUser.setRole(Role.STUDENT);
         otherUser.setStatus(UserStatus.ACTIVE);
+        otherUser.setIdentityVerified(true); otherUser.setIdentityReviewedAt(java.time.LocalDateTime.now());
         otherUser = userRepository.save(otherUser);
     }
 

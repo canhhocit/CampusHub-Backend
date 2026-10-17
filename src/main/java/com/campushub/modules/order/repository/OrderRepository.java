@@ -16,6 +16,14 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
+    @Query("SELECT COUNT(o) > 0 FROM Order o WHERE o.product.id = :id AND " +
+            "(o.status IN :statuses OR (o.status = com.campushub.modules.order.entity.OrderStatus.EXPIRED AND o.clearedAt IS NULL))")
+    boolean hasProductReservation(@Param("id") Long id, @Param("statuses") Collection<OrderStatus> statuses);
+
+    @Query("SELECT COUNT(o) > 0 FROM Order o WHERE o.compartment.id = :id AND " +
+            "(o.status IN :statuses OR (o.status = com.campushub.modules.order.entity.OrderStatus.EXPIRED AND o.clearedAt IS NULL))")
+    boolean hasCompartmentReservation(@Param("id") Long id, @Param("statuses") Collection<OrderStatus> statuses);
+
     Optional<Order> findByOrderNumber(String orderNumber);
 
     Page<Order> findByBuyerId(Long buyerId, Pageable pageable);

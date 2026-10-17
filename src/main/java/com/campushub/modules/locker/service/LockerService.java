@@ -22,10 +22,13 @@ public class LockerService {
 
     private final LockerRepository lockerRepository;
     private final CompartmentRepository compartmentRepository;
+    private final com.campushub.modules.order.repository.OrderRepository orderRepository;
 
-    public LockerService(LockerRepository lockerRepository, CompartmentRepository compartmentRepository) {
+    public LockerService(LockerRepository lockerRepository, CompartmentRepository compartmentRepository,
+                         com.campushub.modules.order.repository.OrderRepository orderRepository) {
         this.lockerRepository = lockerRepository;
         this.compartmentRepository = compartmentRepository;
+        this.orderRepository = orderRepository;
     }
 
     private CompartmentResponse mapCompartment(Compartment compartment) {
@@ -113,7 +116,7 @@ public class LockerService {
 
     @Transactional
     public LockerResponse updateLocker(Long id, LockerUpdateRequest request) {
-        Locker locker = lockerRepository.findById(id)
+        Locker locker = lockerRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new AppException(ErrorCode.LOCKER_NOT_FOUND));
 
         locker.setName(request.getName().trim());
@@ -125,7 +128,7 @@ public class LockerService {
 
     @Transactional
     public LockerResponse updateLockerStatus(Long id, LockerStatusUpdateRequest request) {
-        Locker locker = lockerRepository.findById(id)
+        Locker locker = lockerRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new AppException(ErrorCode.LOCKER_NOT_FOUND));
 
         LockerStatus current = locker.getStatus();
@@ -217,14 +220,23 @@ public class LockerService {
             throw new AppException(ErrorCode.LOCKER_NOT_FOUND);
         }
 
-        Compartment compartment = compartmentRepository.findByIdAndLockerId(compartmentId, lockerId)
+        Compartment compartment = compartmentRepository.findByIdWithLock(compartmentId)
                 .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+
+        if (!compartment.getLocker().getId().equals(lockerId)) {
+            throw new AppException(ErrorCode.COMPARTMENT_NOT_FOUND);
+        }
+        if (orderRepository.hasCompartmentReservation(compartmentId, java.util.Set.of(
+                com.campushub.modules.order.entity.OrderStatus.AWAITING_DEPOSIT,
+                com.campushub.modules.order.entity.OrderStatus.READY_FOR_PICKUP))) {
+            throw new AppException(ErrorCode.UNSAFE_COMPARTMENT_STATUS_TRANSITION);
+        }
 
         CompartmentStatus current = compartment.getStatus();
         CompartmentStatus target = request.getStatus();
 
         // Safe transition rule 1: Cannot manually free OCCUPIED or RESERVED compartments
-        if ((current == CompartmentStatus.OCCUPIED || current == CompartmentStatus.RESERVED) && target == CompartmentStatus.AVAILABLE) {
+        if (current == CompartmentStatus.OCCUPIED || current == CompartmentStatus.RESERVED) {
             throw new AppException(ErrorCode.UNSAFE_COMPARTMENT_STATUS_TRANSITION);
         }
 

@@ -9,6 +9,9 @@ import java.util.Optional;
 
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM Category c WHERE c.id = :id")
+    Optional<Category> findByIdWithLock(@org.springframework.data.repository.query.Param("id") Long id);
     List<Category> findByIsActiveTrueOrderByNameAsc();
     Optional<Category> findByIdAndIsActiveTrue(Long id);
     boolean existsBySlug(String slug);

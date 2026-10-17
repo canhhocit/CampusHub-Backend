@@ -7,6 +7,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class UserManagementResponse {
+    private String identityReviewStatus;
+    public String getIdentityReviewStatus() { return identityReviewStatus; }
+    public void setIdentityReviewStatus(String value) { identityReviewStatus = value; }
+
 
     private Long id;
     private String username;

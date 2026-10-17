@@ -7,6 +7,7 @@ spring:
 
 app:
   jwt:
+    cookie-secure: true
     secret: ${JWT_SECRET}
   security:
     pickup-encryption-key: ${PICKUP_ENCRYPTION_KEY}

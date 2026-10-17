@@ -17,9 +17,11 @@ public class ProductCreateRequest {
     
     @NotNull
     @DecimalMin(value = "0.0", inclusive = true)
+    @jakarta.validation.constraints.Digits(integer = 10, fraction = 2)
     private BigDecimal price;
     
     @Size(max = 500)
+    @jakarta.validation.constraints.Pattern(regexp = "(?i)^https?://[^\\s]+$", message = "Image URL must use HTTP or HTTPS")
     private String imageUrl;
     
     @NotNull

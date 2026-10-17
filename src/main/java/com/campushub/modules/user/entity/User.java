@@ -47,6 +47,20 @@ public class User extends BaseEntity {
     @Column(name = "identity_verified_at")
     private java.time.LocalDateTime identityVerifiedAt;
 
+    @Column(name = "identity_reviewed_at")
+    private java.time.LocalDateTime identityReviewedAt;
+
+    public java.time.LocalDateTime getIdentityReviewedAt() { return identityReviewedAt; }
+    public void setIdentityReviewedAt(java.time.LocalDateTime value) { identityReviewedAt = value; }
+    public String getIdentityReviewStatus() {
+        if (isIdentityApproved()) return "APPROVED";
+        if (identityReviewedAt != null) return "REJECTED";
+        return citizenId == null ? "NOT_SUBMITTED" : "PENDING";
+    }
+    public boolean isIdentityApproved() {
+        return Boolean.TRUE.equals(identityVerified) && identityReviewedAt != null;
+    }
+
     // Getters and Setters
     public String getUsername() {
         return username;

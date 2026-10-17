@@ -2,6 +2,7 @@ package com.campushub.modules.order.dto;
 
 public class OrderAcceptRequest {
 
+    @jakarta.validation.constraints.Positive
     private Long lockerId;
 
     public Long getLockerId() {

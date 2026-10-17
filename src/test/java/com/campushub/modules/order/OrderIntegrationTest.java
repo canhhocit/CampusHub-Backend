@@ -46,6 +46,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@org.springframework.test.context.ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -96,6 +97,7 @@ public class OrderIntegrationTest {
             seller.setFullName("Seller Test");
             seller.setRole(Role.STUDENT);
             seller.setStatus(UserStatus.ACTIVE);
+            seller.setIdentityVerified(true); seller.setIdentityReviewedAt(java.time.LocalDateTime.now());
             seller = userRepository.save(seller);
         } else {
             seller = userRepository.findByUsername("seller_order_test").get();
@@ -109,6 +111,7 @@ public class OrderIntegrationTest {
             buyer.setFullName("Buyer Test");
             buyer.setRole(Role.STUDENT);
             buyer.setStatus(UserStatus.ACTIVE);
+            buyer.setIdentityVerified(true); buyer.setIdentityReviewedAt(java.time.LocalDateTime.now());
             buyer = userRepository.save(buyer);
         } else {
             buyer = userRepository.findByUsername("buyer_order_test").get();
@@ -122,6 +125,7 @@ public class OrderIntegrationTest {
             otherUser.setFullName("Other User");
             otherUser.setRole(Role.STUDENT);
             otherUser.setStatus(UserStatus.ACTIVE);
+            otherUser.setIdentityVerified(true); otherUser.setIdentityReviewedAt(java.time.LocalDateTime.now());
             otherUser = userRepository.save(otherUser);
         } else {
             otherUser = userRepository.findByUsername("other_order_test").get();
@@ -366,6 +370,7 @@ public class OrderIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "seller_order_test", roles = "USER")
     public void testNoAvailableCompartmentFailsGracefully() throws Exception {
         Order order = new Order();
         order.setOrderNumber("ORD-NO-COMPARTMENT");
@@ -412,11 +417,10 @@ public class OrderIntegrationTest {
         orderService.pickupOrder(order.getId(), pickupReq, "buyer_order_test");
 
         // Second pickup attempt -> Rejected
-        try {
-            orderService.pickupOrder(order.getId(), pickupReq, "buyer_order_test");
-        } catch (Exception e) {
-            assertEquals("INVALID_ORDER_STATUS", e.getMessage());
-        }
+        Long orderId = order.getId();
+        var error = org.junit.jupiter.api.Assertions.assertThrows(com.campushub.common.exception.AppException.class,
+                () -> orderService.pickupOrder(orderId, pickupReq, "buyer_order_test"));
+        assertEquals(com.campushub.common.exception.ErrorCode.INVALID_ORDER_STATUS, error.getErrorCode());
     }
 
     @Test
@@ -434,7 +438,7 @@ public class OrderIntegrationTest {
         orderService.depositOrder(order.getId(), "seller_order_test");
 
         OrderPickupRequest wrongReq = new OrderPickupRequest();
-        wrongReq.setPickupCode("000000"); // wrong code
+        wrongReq.setPickupCode("000000".equals(orderService.getRawPickupCodeForTesting(order.getId())) ? "111111" : "000000");
 
         // 4 failed attempts
         for (int i = 1; i <= 4; i++) {

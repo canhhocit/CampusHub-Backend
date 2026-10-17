@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.springframework.test.context.ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional // Rollback after each test
@@ -113,7 +114,7 @@ public class AuthIntegrationTest {
                 
         // 6. Access without token fails
         mockMvc.perform(get("/api/v1/auth/me"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         // 7. Refresh Token
         MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")

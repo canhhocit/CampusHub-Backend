@@ -13,6 +13,12 @@ import java.util.Optional;
 @Repository
 public interface VerificationTokenRepository extends JpaRepository<VerificationToken, Long> {
     Optional<VerificationToken> findByTokenHashAndType(String tokenHash, TokenType type);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT v FROM VerificationToken v WHERE v.tokenHash = :hash AND v.type = :type")
+    Optional<VerificationToken> findByTokenHashAndTypeWithLock(
+            @org.springframework.data.repository.query.Param("hash") String hash,
+            @org.springframework.data.repository.query.Param("type") TokenType type);
     
     @Modifying
     @Query("DELETE FROM VerificationToken v WHERE v.user = :user AND v.type = :type")

@@ -43,6 +43,9 @@ public class OrderService {
 
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
@@ -53,6 +56,7 @@ public class OrderService {
     private final EmailService emailService;
     private final AesEncryptionService aesEncryptionService;
     private final OrderAttemptService orderAttemptService;
+    private final com.campushub.modules.audit.service.AuditService auditService;
 
     // Transient in-memory cache for fast lookup during active session
     private final Map<Long, String> activePickupCodes = new ConcurrentHashMap<>();
@@ -67,7 +71,8 @@ public class OrderService {
                         PasswordEncoder passwordEncoder,
                         EmailService emailService,
                         AesEncryptionService aesEncryptionService,
-                        OrderAttemptService orderAttemptService) {
+                        OrderAttemptService orderAttemptService,
+                        com.campushub.modules.audit.service.AuditService auditService) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
@@ -78,6 +83,7 @@ public class OrderService {
         this.emailService = emailService;
         this.aesEncryptionService = aesEncryptionService;
         this.orderAttemptService = orderAttemptService;
+        this.auditService = auditService;
     }
 
     private OrderResponse mapToOrderResponse(Order order) {
@@ -173,14 +179,15 @@ public class OrderService {
         User buyer = userRepository.findByUsername(buyerUsername)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        if (buyer.getRole() != com.campushub.common.enums.Role.ADMIN && !Boolean.TRUE.equals(buyer.getIdentityVerified())) {
+        if (buyer.getRole() != com.campushub.common.enums.Role.ADMIN && !buyer.isIdentityApproved()) {
             throw new AppException(ErrorCode.IDENTITY_NOT_VERIFIED);
         }
 
-        Product product = productRepository.findById(request.getProductId())
+        Product product = productRepository.findByIdWithLock(request.getProductId())
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
 
-        if (product.getStatus() != ProductStatus.ACTIVE) {
+        if (product.getStatus() != ProductStatus.ACTIVE || !Boolean.TRUE.equals(product.getCategory().getActive())
+                || product.getOwner().getStatus() != com.campushub.common.enums.UserStatus.ACTIVE) {
             throw new AppException(ErrorCode.PRODUCT_NOT_AVAILABLE_FOR_ORDER);
         }
 
@@ -193,7 +200,7 @@ public class OrderService {
                 OrderStatus.AWAITING_DEPOSIT,
                 OrderStatus.READY_FOR_PICKUP
         );
-        if (orderRepository.existsByProductIdAndStatusIn(product.getId(), activeStatuses)) {
+        if (orderRepository.hasProductReservation(product.getId(), activeStatuses)) {
             throw new AppException(ErrorCode.ACTIVE_ORDER_EXISTS);
         }
 
@@ -247,7 +254,7 @@ public class OrderService {
 
     @Transactional
     public OrderResponse acceptOrder(Long orderId, OrderAcceptRequest request, String sellerUsername) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
         if (!order.getSeller().getUsername().equals(sellerUsername)) {
@@ -256,6 +263,10 @@ public class OrderService {
 
         if (order.getStatus() != OrderStatus.PENDING_SELLER) {
             throw new AppException(ErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        if (order.getProduct().getStatus() != ProductStatus.ACTIVE) {
+            throw new AppException(ErrorCode.PRODUCT_NOT_AVAILABLE_FOR_ORDER);
         }
 
         // Allocate compartment in an ACTIVE locker with pessimistic lock
@@ -277,8 +288,13 @@ public class OrderService {
         }
 
         // Lock and verify compartment is still available
+        lockLocker(compartment.getLocker().getId());
         Compartment lockedCompartment = compartmentRepository.findByIdWithLock(compartment.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+        entityManager.refresh(lockedCompartment, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        if (lockedCompartment.getLocker().getStatus() != LockerStatus.ACTIVE) {
+            throw new AppException(ErrorCode.LOCKER_NOT_ACTIVE);
+        }
         if (lockedCompartment.getStatus() != CompartmentStatus.AVAILABLE) {
             throw new AppException(ErrorCode.NO_AVAILABLE_COMPARTMENT);
         }
@@ -296,7 +312,7 @@ public class OrderService {
 
     @Transactional
     public OrderResponse rejectOrder(Long orderId, OrderRejectRequest request, String sellerUsername) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
         if (!order.getSeller().getUsername().equals(sellerUsername)) {
@@ -320,7 +336,7 @@ public class OrderService {
 
     @Transactional
     public OrderResponse cancelOrder(Long orderId, String buyerUsername) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
         if (!order.getBuyer().getUsername().equals(buyerUsername)) {
@@ -342,7 +358,7 @@ public class OrderService {
 
     @Transactional
     public OrderResponse depositOrder(Long orderId, String sellerUsername) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
         if (!order.getSeller().getUsername().equals(sellerUsername)) {
@@ -358,10 +374,19 @@ public class OrderService {
         if (locker == null || compartment == null) {
             throw new AppException(ErrorCode.NO_AVAILABLE_COMPARTMENT);
         }
+        locker = lockLocker(locker.getId());
+        compartment = compartmentRepository.findByIdWithLock(compartment.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+        if (compartment.getStatus() != CompartmentStatus.RESERVED
+                || !compartment.getLocker().getId().equals(locker.getId())) {
+            throw new AppException(ErrorCode.INVALID_COMPARTMENT_STATUS);
+        }
 
         // Simulate IoT operations
-        mockLockerService.openForDeposit(locker, compartment);
-        mockLockerService.confirmItemDeposited(locker, compartment);
+        if (!mockLockerService.openForDeposit(locker, compartment)
+                || !mockLockerService.confirmItemDeposited(locker, compartment)) {
+            throw new AppException(ErrorCode.MOCK_IOT_DEVICE_ERROR);
+        }
 
         // Transition compartment to OCCUPIED
         compartment.setStatus(CompartmentStatus.OCCUPIED);
@@ -406,7 +431,7 @@ public class OrderService {
         return mapToOrderResponse(order);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = PickupValidationException.class)
     public OrderResponse pickupOrder(Long orderId, OrderPickupRequest request, String buyerUsername) {
         Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
@@ -428,7 +453,8 @@ public class OrderService {
             order.setEncryptedPickupCode(null);
             activePickupCodes.remove(order.getId());
             orderRepository.save(order);
-            throw new AppException(ErrorCode.PICKUP_CODE_EXPIRED);
+            order.setPickupCodeHash(null);
+            throw new PickupValidationException(ErrorCode.PICKUP_CODE_EXPIRED);
         }
 
         if (order.getPickupAttempts() != null && order.getPickupAttempts() >= 5) {
@@ -437,23 +463,35 @@ public class OrderService {
 
         if (!passwordEncoder.matches(request.getPickupCode(), order.getPickupCodeHash())) {
             int newAttempts = orderAttemptService.recordFailedPickupAttempt(order.getId());
+            auditService.log(com.campushub.modules.audit.entity.AuditAction.ORDER_PICKUP_FAILED,
+                    com.campushub.modules.audit.entity.AuditEntityType.ORDER, order.getId(),
+                    "Invalid pickup PIN attempt", false, ErrorCode.INVALID_PICKUP_CODE.name());
             if (newAttempts >= 5) {
-                throw new AppException(ErrorCode.PICKUP_ATTEMPTS_EXCEEDED);
+                throw new PickupValidationException(ErrorCode.PICKUP_ATTEMPTS_EXCEEDED);
             }
-            throw new AppException(ErrorCode.INVALID_PICKUP_CODE);
+            throw new PickupValidationException(ErrorCode.INVALID_PICKUP_CODE);
         }
 
         Locker locker = order.getLocker();
         Compartment compartment = order.getCompartment();
 
         // Simulate IoT operations
-        mockLockerService.openForPickup(locker, compartment);
-        mockLockerService.confirmItemPickedUp(locker, compartment);
+        locker = lockLocker(locker.getId());
+        compartment = compartmentRepository.findByIdWithLock(compartment.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+        if (compartment.getStatus() != CompartmentStatus.OCCUPIED) {
+            throw new AppException(ErrorCode.INVALID_COMPARTMENT_STATUS);
+        }
+        if (!mockLockerService.openForPickup(locker, compartment)
+                || !mockLockerService.confirmItemPickedUp(locker, compartment)) {
+            throw new AppException(ErrorCode.MOCK_IOT_DEVICE_ERROR);
+        }
 
         // Complete order and purge persistent encrypted PIN
         order.setStatus(OrderStatus.COMPLETED);
         order.setPickedUpAt(LocalDateTime.now());
         order.setEncryptedPickupCode(null);
+        order.setPickupCodeHash(null);
 
         // Free compartment safely
         compartment.setStatus(CompartmentStatus.AVAILABLE);
@@ -475,9 +513,16 @@ public class OrderService {
     public void checkAndExpireOrders() {
         LocalDateTime now = LocalDateTime.now();
         List<Order> expiredOrders = orderRepository.findExpiredOrders(OrderStatus.READY_FOR_PICKUP, now);
-        for (Order order : expiredOrders) {
+        for (Order candidate : expiredOrders) {
+            Order order = orderRepository.findByIdWithLock(candidate.getId()).orElseThrow();
+            entityManager.refresh(order, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            if (order.getStatus() != OrderStatus.READY_FOR_PICKUP || order.getPickupDeadline() == null
+                    || !order.getPickupDeadline().isBefore(now)) {
+                continue;
+            }
             order.setStatus(OrderStatus.EXPIRED);
             order.setEncryptedPickupCode(null);
+            order.setPickupCodeHash(null);
             activePickupCodes.remove(order.getId());
             orderRepository.save(order);
 
@@ -497,19 +542,27 @@ public class OrderService {
 
     @Transactional
     public OrderResponse adminClearExpiredOrder(Long orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
         if (order.getStatus() != OrderStatus.EXPIRED) {
             throw new AppException(ErrorCode.CANNOT_CLEAR_NON_EXPIRED_ORDER);
+        }
+        if (order.getClearedAt() != null) {
+            return mapToOrderResponse(order);
         }
 
         Locker locker = order.getLocker();
         Compartment compartment = order.getCompartment();
 
         if (locker != null && compartment != null) {
-            mockLockerService.openForPickup(locker, compartment);
-            mockLockerService.confirmItemPickedUp(locker, compartment);
+            locker = lockLocker(locker.getId());
+            compartment = compartmentRepository.findByIdWithLock(compartment.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+            if (!mockLockerService.openForPickup(locker, compartment)
+                    || !mockLockerService.confirmItemPickedUp(locker, compartment)) {
+                throw new AppException(ErrorCode.MOCK_IOT_DEVICE_ERROR);
+            }
             compartment.setStatus(CompartmentStatus.AVAILABLE);
             compartmentRepository.save(compartment);
         }
@@ -523,6 +576,16 @@ public class OrderService {
         order.setClearedAt(LocalDateTime.now());
         order = orderRepository.save(order);
         return mapToOrderResponse(order);
+    }
+
+    private Locker lockLocker(Long id) {
+        Locker locker = lockerRepository.findByIdWithLock(id)
+                .orElseThrow(() -> new AppException(ErrorCode.LOCKER_NOT_FOUND));
+        entityManager.refresh(locker, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        if (locker.getStatus() != LockerStatus.ACTIVE) {
+            throw new AppException(ErrorCode.LOCKER_NOT_ACTIVE);
+        }
+        return locker;
     }
 
     private void sendEmailAfterCommit(String to, String subject, String text) {

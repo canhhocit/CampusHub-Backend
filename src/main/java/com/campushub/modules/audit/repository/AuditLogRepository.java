@@ -38,8 +38,8 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
             Pageable pageable
     );
 
-    @Query("SELECT COUNT(a) FROM AuditLog a WHERE a.action = :action AND a.createdAt >= :since")
-    long countByActionSince(@Param("action") AuditAction action, @Param("since") LocalDateTime since);
+    @Query("SELECT COUNT(a) FROM AuditLog a WHERE a.action = :action AND a.success = false AND a.createdAt >= :since")
+    long countFailedByActionSince(@Param("action") AuditAction action, @Param("since") LocalDateTime since);
 
     @Query("SELECT COUNT(a) FROM AuditLog a WHERE a.success = false AND a.createdAt >= :since")
     long countFailedSince(@Param("since") LocalDateTime since);

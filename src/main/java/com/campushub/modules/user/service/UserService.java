@@ -27,9 +27,9 @@ public class UserService {
         res.setRole(user.getRole());
         res.setStatus(user.getStatus());
         res.setDateOfBirth(user.getDateOfBirth());
-        boolean isVerified = user.getRole() == com.campushub.common.enums.Role.ADMIN 
-                || Boolean.TRUE.equals(user.getIdentityVerified());
+        boolean isVerified = user.isIdentityApproved();
         res.setIdentityVerified(isVerified);
+        res.setIdentityReviewStatus(user.getIdentityReviewStatus());
         res.setCitizenId(user.getCitizenId());
         res.setIdCardFrontUrl(user.getIdCardFrontUrl());
         res.setIdCardBackUrl(user.getIdCardBackUrl());
@@ -47,7 +47,7 @@ public class UserService {
 
     @Transactional
     public UserProfileResponse updateProfile(String username, UpdateProfileRequest request) {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameWithLock(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         user.setFullName(request.getFullName().trim());
         return mapToProfile(userRepository.save(user));
@@ -55,10 +55,10 @@ public class UserService {
 
     @Transactional
     public UserProfileResponse verifyIdentity(String username, com.campushub.modules.user.dto.VerifyIdentityRequest request) {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameWithLock(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        if (Boolean.TRUE.equals(user.getIdentityVerified())) {
+        if (user.isIdentityApproved()) {
             throw new AppException(ErrorCode.ALREADY_IDENTITY_VERIFIED);
         }
 
@@ -78,8 +78,10 @@ public class UserService {
         if (request.getIdCardBackUrl() != null && !request.getIdCardBackUrl().isBlank()) {
             user.setIdCardBackUrl(request.getIdCardBackUrl().trim());
         }
-        user.setIdentityVerified(true);
-        user.setIdentityVerifiedAt(java.time.LocalDateTime.now());
+        // Submission is evidence for review, never proof of identity.
+        user.setIdentityVerified(false);
+        user.setIdentityVerifiedAt(null);
+        user.setIdentityReviewedAt(null);
 
         return mapToProfile(userRepository.save(user));
     }

@@ -14,6 +14,13 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.id = :id")
+    Optional<User> findByIdWithLock(@Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.username = :username")
+    Optional<User> findByUsernameWithLock(@Param("username") String username);
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
     Optional<User> findByUsernameOrEmail(String username, String email);
@@ -25,6 +32,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Admin dashboard queries
     long countByStatus(UserStatus status);
     long countByCreatedAtAfter(LocalDateTime date);
+    @Query("SELECT COUNT(u) FROM User u WHERE u.identityVerified = true AND u.identityReviewedAt IS NOT NULL")
     long countByIdentityVerifiedTrue();
 
     @Query("SELECT u FROM User u WHERE " +

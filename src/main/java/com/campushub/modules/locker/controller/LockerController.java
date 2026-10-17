@@ -38,10 +38,11 @@ public class LockerController {
             @RequestParam(defaultValue = "createdAt") String sort,
             @RequestParam(defaultValue = "desc") String direction) {
 
+        com.campushub.common.model.PageRequests.validateSort(sort, direction, java.util.Set.of("code", "name", "createdAt"));
         if (size > 50) size = 50;
         Sort.Direction dir = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         String sortProp = sort.equals("code") ? "code" : (sort.equals("name") ? "name" : "createdAt");
-        Pageable pageable = PageRequest.of(page, size, Sort.by(dir, sortProp));
+        Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(dir, sortProp));
 
         return ResponseEntity.ok(lockerService.getLockers(status, search, pageable));
     }
