@@ -70,6 +70,10 @@ public class MarketplaceController {
     public ResponseEntity<Page<ProductResponse>> getProducts(
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) java.math.BigDecimal minPrice,
+            @RequestParam(required = false) java.math.BigDecimal maxPrice,
+            @RequestParam(required = false) com.campushub.modules.marketplace.entity.ListingType listingType,
+            @RequestParam(required = false) Long lockerId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt") String sort,
@@ -82,7 +86,7 @@ public class MarketplaceController {
         String sortProp = sort.equals("price") ? "price" : "createdAt";
         Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(dir, sortProp));
         
-        return ResponseEntity.ok(marketplaceService.getPublicProducts(categoryId, search, pageable));
+        return ResponseEntity.ok(marketplaceService.getPublicProducts(categoryId, search, minPrice, maxPrice, listingType, lockerId, pageable));
     }
 
     @GetMapping("/products/{id}")

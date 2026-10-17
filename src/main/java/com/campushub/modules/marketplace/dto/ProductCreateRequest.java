@@ -43,6 +43,8 @@ public class ProductCreateRequest {
 
     private java.util.List<@Size(max = 500) String> detailImageUrls;
 
+    private Long lockerId;
+
     public String getVideoUrl() { return videoUrl; }
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
     public java.util.List<String> getDetailImageUrls() { return detailImageUrls; }
@@ -64,4 +66,6 @@ public class ProductCreateRequest {
     public void setRentPricePerDay(BigDecimal rentPricePerDay) { this.rentPricePerDay = rentPricePerDay; }
     public BigDecimal getDepositAmount() { return depositAmount; }
     public void setDepositAmount(BigDecimal depositAmount) { this.depositAmount = depositAmount; }
+    public Long getLockerId() { return lockerId; }
+    public void setLockerId(Long lockerId) { this.lockerId = lockerId; }
 }

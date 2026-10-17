@@ -19,9 +19,37 @@ public class ProductResponse {
     private java.util.List<String> detailImageUrls = new java.util.ArrayList<>();
     private CategoryResponse category;
     private OwnerResponse owner;
+    private LockerSummaryResponse locker;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Long version;
+
+    public static class LockerSummaryResponse {
+        private Long id;
+        private String code;
+        private String name;
+        private String location;
+
+        public LockerSummaryResponse() {}
+        public LockerSummaryResponse(Long id, String code, String name, String location) {
+            this.id = id;
+            this.code = code;
+            this.name = name;
+            this.location = location;
+        }
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getCode() { return code; }
+        public void setCode(String code) { this.code = code; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getLocation() { return location; }
+        public void setLocation(String location) { this.location = location; }
+    }
+
+    public LockerSummaryResponse getLocker() { return locker; }
+    public void setLocker(LockerSummaryResponse locker) { this.locker = locker; }
 
     public String getVideoUrl() { return videoUrl; }
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }

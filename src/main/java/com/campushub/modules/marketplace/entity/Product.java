@@ -51,6 +51,10 @@ public class Product extends BaseEntity {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "locker_id")
+    private com.campushub.modules.locker.entity.Locker locker;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version = 0L;
@@ -167,4 +171,13 @@ public class Product extends BaseEntity {
     public void setDepositAmount(BigDecimal depositAmount) {
         this.depositAmount = depositAmount;
     }
+
+    public com.campushub.modules.locker.entity.Locker getLocker() {
+        return locker;
+    }
+
+    public void setLocker(com.campushub.modules.locker.entity.Locker locker) {
+        this.locker = locker;
+    }
 }
+

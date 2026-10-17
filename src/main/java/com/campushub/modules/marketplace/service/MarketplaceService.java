@@ -26,17 +26,20 @@ public class MarketplaceService {
     private final UserRepository userRepository;
     private final com.campushub.modules.order.repository.OrderRepository orderRepository;
     private final com.campushub.modules.admin.service.SystemSettingService systemSettingService;
+    private final com.campushub.modules.locker.repository.LockerRepository lockerRepository;
 
     public MarketplaceService(ProductRepository productRepository, 
                               CategoryRepository categoryRepository, 
                               UserRepository userRepository,
                               com.campushub.modules.order.repository.OrderRepository orderRepository,
-                              com.campushub.modules.admin.service.SystemSettingService systemSettingService) {
+                              com.campushub.modules.admin.service.SystemSettingService systemSettingService,
+                              com.campushub.modules.locker.repository.LockerRepository lockerRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.userRepository = userRepository;
         this.orderRepository = orderRepository;
         this.systemSettingService = systemSettingService;
+        this.lockerRepository = lockerRepository;
     }
 
     private CategoryResponse mapCategory(Category category) {
@@ -67,6 +70,14 @@ public class MarketplaceService {
                 product.getOwner().getFullName(),
                 product.getOwner().isIdentityApproved()
         ));
+        if (product.getLocker() != null) {
+            res.setLocker(new ProductResponse.LockerSummaryResponse(
+                    product.getLocker().getId(),
+                    product.getLocker().getCode(),
+                    product.getLocker().getName(),
+                    product.getLocker().getLocation()
+            ));
+        }
         res.setCreatedAt(product.getCreatedAt());
         res.setUpdatedAt(product.getUpdatedAt());
         res.setVersion(product.getVersion());
@@ -113,10 +124,30 @@ public class MarketplaceService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProductResponse> getPublicProducts(Long categoryId, String search, Pageable pageable) {
+    public Page<ProductResponse> getPublicProducts(
+            Long categoryId,
+            String search,
+            java.math.BigDecimal minPrice,
+            java.math.BigDecimal maxPrice,
+            com.campushub.modules.marketplace.entity.ListingType listingType,
+            Long lockerId,
+            Pageable pageable) {
         String searchPattern = (search == null || search.trim().isEmpty()) ? null : "%" + search.trim() + "%";
-        return productRepository.findAllPublicProducts(ProductStatus.ACTIVE, categoryId, searchPattern, pageable)
-                .map(this::mapProduct);
+        return productRepository.findAllPublicProducts(
+                ProductStatus.ACTIVE,
+                categoryId,
+                searchPattern,
+                minPrice,
+                maxPrice,
+                listingType,
+                lockerId,
+                pageable
+        ).map(this::mapProduct);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> getPublicProducts(Long categoryId, String search, Pageable pageable) {
+        return getPublicProducts(categoryId, search, null, null, null, null, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -186,6 +217,10 @@ public class MarketplaceService {
         product.setRentPricePerDay(request.getRentPricePerDay());
         product.setDepositAmount(request.getDepositAmount());
 
+        if (request.getLockerId() != null) {
+            lockerRepository.findById(request.getLockerId()).ifPresent(product::setLocker);
+        }
+
         if (request.getDetailImageUrls() != null) {
             for (int i = 0; i < request.getDetailImageUrls().size(); i++) {
                 String imgUrl = request.getDetailImageUrls().get(i);
@@ -229,6 +264,10 @@ public class MarketplaceService {
         }
         product.setRentPricePerDay(request.getRentPricePerDay());
         product.setDepositAmount(request.getDepositAmount());
+
+        if (request.getLockerId() != null) {
+            lockerRepository.findById(request.getLockerId()).ifPresent(product::setLocker);
+        }
 
         if (request.getDetailImageUrls() != null) {
             product.clearDetailImages();

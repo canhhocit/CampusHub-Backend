@@ -29,7 +29,6 @@ public class LockerController {
     }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<LockerResponse>> getLockers(
             @RequestParam(required = false) LockerStatus status,
             @RequestParam(required = false) String search,
@@ -48,7 +47,6 @@ public class LockerController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<LockerDetailResponse> getLocker(@PathVariable Long id) {
         return ResponseEntity.ok(lockerService.getLocker(id));
     }
