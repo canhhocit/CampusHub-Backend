@@ -30,6 +30,16 @@ public class ProductUpdateRequest {
     @NotNull
     private Long version;
 
+    private com.campushub.modules.marketplace.entity.ListingType listingType = com.campushub.modules.marketplace.entity.ListingType.SALE;
+
+    @DecimalMin(value = "0.0", inclusive = true)
+    @jakarta.validation.constraints.Digits(integer = 10, fraction = 2)
+    private BigDecimal rentPricePerDay;
+
+    @DecimalMin(value = "0.0", inclusive = true)
+    @jakarta.validation.constraints.Digits(integer = 10, fraction = 2)
+    private BigDecimal depositAmount;
+
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getDescription() { return description; }
@@ -42,4 +52,10 @@ public class ProductUpdateRequest {
     public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }
+    public com.campushub.modules.marketplace.entity.ListingType getListingType() { return listingType; }
+    public void setListingType(com.campushub.modules.marketplace.entity.ListingType listingType) { this.listingType = listingType; }
+    public BigDecimal getRentPricePerDay() { return rentPricePerDay; }
+    public void setRentPricePerDay(BigDecimal rentPricePerDay) { this.rentPricePerDay = rentPricePerDay; }
+    public BigDecimal getDepositAmount() { return depositAmount; }
+    public void setDepositAmount(BigDecimal depositAmount) { this.depositAmount = depositAmount; }
 }

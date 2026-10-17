@@ -9,6 +9,10 @@ public class OrderCreateRequest {
 
     private Long preferredLockerId;
 
+    private com.campushub.modules.order.entity.OrderType orderType = com.campushub.modules.order.entity.OrderType.PURCHASE;
+
+    private Integer rentalDurationDays;
+
     public Long getProductId() {
         return productId;
     }
@@ -23,5 +27,21 @@ public class OrderCreateRequest {
 
     public void setPreferredLockerId(Long preferredLockerId) {
         this.preferredLockerId = preferredLockerId;
+    }
+
+    public com.campushub.modules.order.entity.OrderType getOrderType() {
+        return orderType;
+    }
+
+    public void setOrderType(com.campushub.modules.order.entity.OrderType orderType) {
+        this.orderType = orderType;
+    }
+
+    public Integer getRentalDurationDays() {
+        return rentalDurationDays;
+    }
+
+    public void setRentalDurationDays(Integer rentalDurationDays) {
+        this.rentalDurationDays = rentalDurationDays;
     }
 }

@@ -26,6 +26,16 @@ public class Product extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private ProductStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "listing_type", nullable = false, length = 20)
+    private ListingType listingType = ListingType.SALE;
+
+    @Column(name = "rent_price_per_day", precision = 12, scale = 2)
+    private BigDecimal rentPricePerDay;
+
+    @Column(name = "deposit_amount", precision = 12, scale = 2)
+    private BigDecimal depositAmount;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -101,5 +111,29 @@ public class Product extends BaseEntity {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    public ListingType getListingType() {
+        return listingType;
+    }
+
+    public void setListingType(ListingType listingType) {
+        this.listingType = listingType;
+    }
+
+    public BigDecimal getRentPricePerDay() {
+        return rentPricePerDay;
+    }
+
+    public void setRentPricePerDay(BigDecimal rentPricePerDay) {
+        this.rentPricePerDay = rentPricePerDay;
+    }
+
+    public BigDecimal getDepositAmount() {
+        return depositAmount;
+    }
+
+    public void setDepositAmount(BigDecimal depositAmount) {
+        this.depositAmount = depositAmount;
     }
 }

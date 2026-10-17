@@ -12,6 +12,9 @@ public class ProductResponse {
     private BigDecimal price;
     private String imageUrl;
     private ProductStatus status;
+    private com.campushub.modules.marketplace.entity.ListingType listingType = com.campushub.modules.marketplace.entity.ListingType.SALE;
+    private BigDecimal rentPricePerDay;
+    private BigDecimal depositAmount;
     private CategoryResponse category;
     private OwnerResponse owner;
     private LocalDateTime createdAt;
@@ -71,4 +74,10 @@ public class ProductResponse {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }
+    public com.campushub.modules.marketplace.entity.ListingType getListingType() { return listingType; }
+    public void setListingType(com.campushub.modules.marketplace.entity.ListingType listingType) { this.listingType = listingType; }
+    public BigDecimal getRentPricePerDay() { return rentPricePerDay; }
+    public void setRentPricePerDay(BigDecimal rentPricePerDay) { this.rentPricePerDay = rentPricePerDay; }
+    public BigDecimal getDepositAmount() { return depositAmount; }
+    public void setDepositAmount(BigDecimal depositAmount) { this.depositAmount = depositAmount; }
 }

@@ -11,6 +11,8 @@ public class OrderDetailResponse extends OrderResponse {
     private LocalDateTime cancelledAt;
     private String rejectionReason;
     private Long version;
+    private LocalDateTime returnDepositAt;
+    private LocalDateTime returnPickedUpAt;
     private String pickupCode;
 
     public LocalDateTime getPickupDeadline() {
@@ -67,6 +69,22 @@ public class OrderDetailResponse extends OrderResponse {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    public LocalDateTime getReturnDepositAt() {
+        return returnDepositAt;
+    }
+
+    public void setReturnDepositAt(LocalDateTime returnDepositAt) {
+        this.returnDepositAt = returnDepositAt;
+    }
+
+    public LocalDateTime getReturnPickedUpAt() {
+        return returnPickedUpAt;
+    }
+
+    public void setReturnPickedUpAt(LocalDateTime returnPickedUpAt) {
+        this.returnPickedUpAt = returnPickedUpAt;
     }
 
     public String getPickupCode() {

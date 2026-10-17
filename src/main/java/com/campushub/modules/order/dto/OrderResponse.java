@@ -1,6 +1,7 @@
 package com.campushub.modules.order.dto;
 
 import com.campushub.modules.order.entity.OrderStatus;
+import com.campushub.modules.order.entity.OrderType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,6 +15,13 @@ public class OrderResponse {
     private String productImageUrl;
     private BigDecimal priceSnapshot;
     private OrderStatus status;
+    private OrderType orderType = OrderType.PURCHASE;
+    private Integer rentalDurationDays;
+    private LocalDateTime dueReturnAt;
+    private BigDecimal depositAmount;
+    private BigDecimal platformFee;
+    private BigDecimal sellerPayout;
+    private BigDecimal totalAmount;
 
     private Long buyerId;
     private String buyerUsername;
@@ -30,6 +38,11 @@ public class OrderResponse {
 
     private Long compartmentId;
     private String compartmentCode;
+
+    private Long returnLockerId;
+    private String returnLockerName;
+    private Long returnCompartmentId;
+    private String returnCompartmentCode;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -200,5 +213,93 @@ public class OrderResponse {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public OrderType getOrderType() {
+        return orderType;
+    }
+
+    public void setOrderType(OrderType orderType) {
+        this.orderType = orderType;
+    }
+
+    public Integer getRentalDurationDays() {
+        return rentalDurationDays;
+    }
+
+    public void setRentalDurationDays(Integer rentalDurationDays) {
+        this.rentalDurationDays = rentalDurationDays;
+    }
+
+    public LocalDateTime getDueReturnAt() {
+        return dueReturnAt;
+    }
+
+    public void setDueReturnAt(LocalDateTime dueReturnAt) {
+        this.dueReturnAt = dueReturnAt;
+    }
+
+    public BigDecimal getDepositAmount() {
+        return depositAmount;
+    }
+
+    public void setDepositAmount(BigDecimal depositAmount) {
+        this.depositAmount = depositAmount;
+    }
+
+    public BigDecimal getPlatformFee() {
+        return platformFee;
+    }
+
+    public void setPlatformFee(BigDecimal platformFee) {
+        this.platformFee = platformFee;
+    }
+
+    public BigDecimal getSellerPayout() {
+        return sellerPayout;
+    }
+
+    public void setSellerPayout(BigDecimal sellerPayout) {
+        this.sellerPayout = sellerPayout;
+    }
+
+    public BigDecimal getTotalAmount() {
+        return totalAmount;
+    }
+
+    public void setTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount;
+    }
+
+    public Long getReturnLockerId() {
+        return returnLockerId;
+    }
+
+    public void setReturnLockerId(Long returnLockerId) {
+        this.returnLockerId = returnLockerId;
+    }
+
+    public String getReturnLockerName() {
+        return returnLockerName;
+    }
+
+    public void setReturnLockerName(String returnLockerName) {
+        this.returnLockerName = returnLockerName;
+    }
+
+    public Long getReturnCompartmentId() {
+        return returnCompartmentId;
+    }
+
+    public void setReturnCompartmentId(Long returnCompartmentId) {
+        this.returnCompartmentId = returnCompartmentId;
+    }
+
+    public String getReturnCompartmentCode() {
+        return returnCompartmentCode;
+    }
+
+    public void setReturnCompartmentCode(String returnCompartmentCode) {
+        this.returnCompartmentCode = returnCompartmentCode;
     }
 }

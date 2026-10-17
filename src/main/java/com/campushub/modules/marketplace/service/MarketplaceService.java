@@ -48,6 +48,9 @@ public class MarketplaceService {
         res.setPrice(product.getPrice());
         res.setImageUrl(product.getImageUrl());
         res.setStatus(product.getStatus());
+        res.setListingType(product.getListingType());
+        res.setRentPricePerDay(product.getRentPricePerDay());
+        res.setDepositAmount(product.getDepositAmount());
         res.setCategory(mapCategory(product.getCategory()));
         res.setOwner(new ProductResponse.OwnerResponse(
                 product.getOwner().getId(),
@@ -148,6 +151,11 @@ public class MarketplaceService {
         product.setCategory(category);
         product.setOwner(user);
         product.setStatus(ProductStatus.ACTIVE);
+        if (request.getListingType() != null) {
+            product.setListingType(request.getListingType());
+        }
+        product.setRentPricePerDay(request.getRentPricePerDay());
+        product.setDepositAmount(request.getDepositAmount());
 
         product = productRepository.save(product);
         return mapProduct(product);
@@ -175,6 +183,11 @@ public class MarketplaceService {
         product.setPrice(request.getPrice());
         product.setImageUrl(request.getImageUrl());
         product.setCategory(category);
+        if (request.getListingType() != null) {
+            product.setListingType(request.getListingType());
+        }
+        product.setRentPricePerDay(request.getRentPricePerDay());
+        product.setDepositAmount(request.getDepositAmount());
 
         product = productRepository.saveAndFlush(product);
         return mapProduct(product);

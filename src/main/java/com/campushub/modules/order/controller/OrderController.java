@@ -108,6 +108,32 @@ public class OrderController {
         return ResponseEntity.ok(orderService.pickupOrder(id, request, authentication.getName()));
     }
 
+    @PostMapping("/{id}/initiate-return")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<OrderResponse> initiateReturn(
+            @PathVariable Long id,
+            @Valid @RequestBody OrderReturnRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(orderService.initiateReturn(id, request, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/deposit-return")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<OrderResponse> depositReturn(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(orderService.depositReturn(id, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/pickup-return")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<OrderResponse> pickupReturn(
+            @PathVariable Long id,
+            @Valid @RequestBody OrderPickupRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(orderService.pickupReturn(id, request, authentication.getName()));
+    }
+
     @PostMapping("/{id}/clear-expired")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OrderResponse> clearExpiredOrder(

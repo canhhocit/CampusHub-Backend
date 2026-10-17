@@ -23,9 +23,24 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminService adminService;
+    private final com.campushub.modules.admin.service.SystemSettingService systemSettingService;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService, com.campushub.modules.admin.service.SystemSettingService systemSettingService) {
         this.adminService = adminService;
+        this.systemSettingService = systemSettingService;
+    }
+
+    @GetMapping("/settings/fees")
+    @Operation(summary = "Get platform fee configuration", description = "Get commission rates for sales and rentals")
+    public ResponseEntity<com.campushub.modules.admin.dto.FeeConfigResponse> getFeeConfig() {
+        return ResponseEntity.ok(systemSettingService.getFeeConfig());
+    }
+
+    @PutMapping("/settings/fees")
+    @Operation(summary = "Update platform fee configuration", description = "Update commission rates for sales and rentals")
+    public ResponseEntity<com.campushub.modules.admin.dto.FeeConfigResponse> updateFeeConfig(
+            @Valid @RequestBody com.campushub.modules.admin.dto.UpdateFeeConfigRequest request) {
+        return ResponseEntity.ok(systemSettingService.updateFeeConfig(request));
     }
 
     @PatchMapping("/users/{userId}/identity")

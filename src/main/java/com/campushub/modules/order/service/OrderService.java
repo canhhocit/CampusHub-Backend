@@ -16,9 +16,11 @@ import com.campushub.modules.marketplace.repository.ProductRepository;
 import com.campushub.modules.order.dto.*;
 import com.campushub.modules.order.entity.Order;
 import com.campushub.modules.order.entity.OrderStatus;
+import com.campushub.modules.order.entity.OrderType;
 import com.campushub.modules.order.repository.OrderRepository;
 import com.campushub.modules.user.entity.User;
 import com.campushub.modules.user.repository.UserRepository;
+import java.math.BigDecimal;
 import com.campushub.common.security.AesEncryptionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +59,7 @@ public class OrderService {
     private final AesEncryptionService aesEncryptionService;
     private final OrderAttemptService orderAttemptService;
     private final com.campushub.modules.audit.service.AuditService auditService;
+    private final com.campushub.modules.admin.service.SystemSettingService systemSettingService;
 
     // Transient in-memory cache for fast lookup during active session
     private final Map<Long, String> activePickupCodes = new ConcurrentHashMap<>();
@@ -72,7 +75,8 @@ public class OrderService {
                         EmailService emailService,
                         AesEncryptionService aesEncryptionService,
                         OrderAttemptService orderAttemptService,
-                        com.campushub.modules.audit.service.AuditService auditService) {
+                        com.campushub.modules.audit.service.AuditService auditService,
+                        com.campushub.modules.admin.service.SystemSettingService systemSettingService) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
@@ -84,6 +88,7 @@ public class OrderService {
         this.aesEncryptionService = aesEncryptionService;
         this.orderAttemptService = orderAttemptService;
         this.auditService = auditService;
+        this.systemSettingService = systemSettingService;
     }
 
     private OrderResponse mapToOrderResponse(Order order) {
@@ -116,6 +121,25 @@ public class OrderService {
             res.setCompartmentCode(order.getCompartment().getCode());
         }
 
+        if (order.getReturnCompartment() != null) {
+            res.setReturnCompartmentId(order.getReturnCompartment().getId());
+            res.setReturnCompartmentCode(order.getReturnCompartment().getCode());
+            if (order.getReturnCompartment().getLocker() != null) {
+                res.setReturnLockerId(order.getReturnCompartment().getLocker().getId());
+                res.setReturnLockerName(order.getReturnCompartment().getLocker().getName());
+            }
+        }
+
+        res.setOrderType(order.getOrderType());
+        res.setRentalDurationDays(order.getRentalDurationDays());
+        res.setDueReturnAt(order.getDueReturnAt());
+        res.setDepositAmount(order.getDepositAmount());
+        res.setPlatformFee(order.getPlatformFee());
+        res.setSellerPayout(order.getSellerPayout());
+        java.math.BigDecimal total1 = (order.getPriceSnapshot() != null ? order.getPriceSnapshot() : java.math.BigDecimal.ZERO)
+                .add(order.getDepositAmount() != null ? order.getDepositAmount() : java.math.BigDecimal.ZERO);
+        res.setTotalAmount(total1);
+
         res.setCreatedAt(order.getCreatedAt());
         res.setUpdatedAt(order.getUpdatedAt());
         return res;
@@ -130,6 +154,16 @@ public class OrderService {
         res.setProductImageUrl(order.getProduct().getImageUrl());
         res.setPriceSnapshot(order.getPriceSnapshot());
         res.setStatus(order.getStatus());
+
+        res.setOrderType(order.getOrderType());
+        res.setRentalDurationDays(order.getRentalDurationDays());
+        res.setDueReturnAt(order.getDueReturnAt());
+        res.setDepositAmount(order.getDepositAmount());
+        res.setPlatformFee(order.getPlatformFee());
+        res.setSellerPayout(order.getSellerPayout());
+        java.math.BigDecimal total2 = (order.getPriceSnapshot() != null ? order.getPriceSnapshot() : java.math.BigDecimal.ZERO)
+                .add(order.getDepositAmount() != null ? order.getDepositAmount() : java.math.BigDecimal.ZERO);
+        res.setTotalAmount(total2);
 
         res.setBuyerId(order.getBuyer().getId());
         res.setBuyerUsername(order.getBuyer().getUsername());
@@ -151,6 +185,15 @@ public class OrderService {
             res.setCompartmentCode(order.getCompartment().getCode());
         }
 
+        if (order.getReturnCompartment() != null) {
+            res.setReturnCompartmentId(order.getReturnCompartment().getId());
+            res.setReturnCompartmentCode(order.getReturnCompartment().getCode());
+            if (order.getReturnCompartment().getLocker() != null) {
+                res.setReturnLockerId(order.getReturnCompartment().getLocker().getId());
+                res.setReturnLockerName(order.getReturnCompartment().getLocker().getName());
+            }
+        }
+
         res.setCreatedAt(order.getCreatedAt());
         res.setUpdatedAt(order.getUpdatedAt());
 
@@ -158,6 +201,8 @@ public class OrderService {
         res.setPickupAttempts(order.getPickupAttempts());
         res.setDepositAt(order.getDepositAt());
         res.setPickedUpAt(order.getPickedUpAt());
+        res.setReturnDepositAt(order.getReturnDepositAt());
+        res.setReturnPickedUpAt(order.getReturnPickedUpAt());
         res.setCancelledAt(order.getCancelledAt());
         res.setRejectionReason(order.getRejectionReason());
         res.setVersion(order.getVersion());
@@ -168,6 +213,13 @@ public class OrderService {
                 res.setPickupCode(aesEncryptionService.decrypt(order.getEncryptedPickupCode()));
             } else {
                 res.setPickupCode(activePickupCodes.get(order.getId()));
+            }
+        }
+
+        // Security check: ONLY the seller (item owner) can see the return pickup code
+        if (order.getStatus() == OrderStatus.READY_FOR_RETURN_PICKUP && order.getSeller().getUsername().equals(username)) {
+            if (order.getEncryptedReturnPickupCode() != null) {
+                res.setPickupCode(aesEncryptionService.decrypt(order.getEncryptedReturnPickupCode()));
             }
         }
 
@@ -198,11 +250,16 @@ public class OrderService {
         Set<OrderStatus> activeStatuses = Set.of(
                 OrderStatus.PENDING_SELLER,
                 OrderStatus.AWAITING_DEPOSIT,
-                OrderStatus.READY_FOR_PICKUP
+                OrderStatus.READY_FOR_PICKUP,
+                OrderStatus.RENTING,
+                OrderStatus.AWAITING_RETURN_DEPOSIT,
+                OrderStatus.READY_FOR_RETURN_PICKUP
         );
         if (orderRepository.hasProductReservation(product.getId(), activeStatuses)) {
             throw new AppException(ErrorCode.ACTIVE_ORDER_EXISTS);
         }
+
+        OrderType orderType = request.getOrderType() != null ? request.getOrderType() : OrderType.PURCHASE;
 
         Order order = new Order();
         String uniqueSuffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
@@ -210,8 +267,37 @@ public class OrderService {
         order.setProduct(product);
         order.setBuyer(buyer);
         order.setSeller(product.getOwner());
-        order.setPriceSnapshot(product.getPrice());
         order.setStatus(OrderStatus.PENDING_SELLER);
+        order.setOrderType(orderType);
+
+        if (orderType == OrderType.RENTAL) {
+            int durationDays = (request.getRentalDurationDays() != null && request.getRentalDurationDays() > 0)
+                    ? request.getRentalDurationDays() : 1;
+            var feeCalc = systemSettingService.calculateFees(
+                    OrderType.RENTAL,
+                    product.getPrice(),
+                    product.getRentPricePerDay(),
+                    product.getDepositAmount(),
+                    durationDays
+            );
+            order.setRentalDurationDays(durationDays);
+            order.setPriceSnapshot(feeCalc.totalAmount().subtract(feeCalc.depositAmount()));
+            order.setDepositAmount(feeCalc.depositAmount());
+            order.setPlatformFee(feeCalc.platformFee());
+            order.setSellerPayout(feeCalc.sellerPayout());
+        } else {
+            var feeCalc = systemSettingService.calculateFees(
+                    OrderType.PURCHASE,
+                    product.getPrice(),
+                    null,
+                    null,
+                    null
+            );
+            order.setPriceSnapshot(product.getPrice());
+            order.setDepositAmount(BigDecimal.ZERO);
+            order.setPlatformFee(feeCalc.platformFee());
+            order.setSellerPayout(feeCalc.sellerPayout());
+        }
 
         order = orderRepository.save(order);
         return mapToOrderResponse(order);
@@ -487,25 +573,204 @@ public class OrderService {
             throw new AppException(ErrorCode.MOCK_IOT_DEVICE_ERROR);
         }
 
-        // Complete order and purge persistent encrypted PIN
-        order.setStatus(OrderStatus.COMPLETED);
+        // Handle post-pickup state depending on order type (PURCHASE vs RENTAL)
+        Product product = order.getProduct();
         order.setPickedUpAt(LocalDateTime.now());
         order.setEncryptedPickupCode(null);
         order.setPickupCodeHash(null);
 
-        // Free compartment safely
+        // Free compartment safely since buyer took the item
         compartment.setStatus(CompartmentStatus.AVAILABLE);
         compartmentRepository.save(compartment);
 
-        // Update product to SOLD
-        Product product = order.getProduct();
-        product.setStatus(ProductStatus.SOLD);
+        if (order.getOrderType() == OrderType.RENTAL) {
+            order.setStatus(OrderStatus.RENTING);
+            int durationDays = order.getRentalDurationDays() != null && order.getRentalDurationDays() > 0 
+                    ? order.getRentalDurationDays() 
+                    : 1;
+            order.setDueReturnAt(order.getPickedUpAt().plusDays(durationDays));
+            product.setStatus(ProductStatus.RENTED);
+
+            sendEmailAfterCommit(
+                    order.getBuyer().getEmail(),
+                    "CampusHub - Bắt đầu thời gian thuê: Đơn " + order.getOrderNumber(),
+                    "Bạn đã nhận thành công sản phẩm '" + product.getTitle() + "'. Thời hạn thuê là " + durationDays + " ngày, hạn trả là: " + order.getDueReturnAt()
+            );
+        } else {
+            order.setStatus(OrderStatus.COMPLETED);
+            product.setStatus(ProductStatus.SOLD);
+        }
         productRepository.save(product);
 
         // Invalidate transient pickup code
         activePickupCodes.remove(order.getId());
 
         order = orderRepository.save(order);
+        return mapToOrderResponse(order);
+    }
+
+    @Transactional
+    public OrderResponse initiateReturn(Long orderId, OrderReturnRequest request, String buyerUsername) {
+        Order order = orderRepository.findByIdWithLock(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getBuyer().getUsername().equals(buyerUsername)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        if (order.getOrderType() != OrderType.RENTAL || order.getStatus() != OrderStatus.RENTING) {
+            throw new AppException(ErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        Compartment returnCompartment = compartmentRepository.findByIdWithLock(request.getCompartmentId())
+                .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+        entityManager.refresh(returnCompartment, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+
+        if (!returnCompartment.getLocker().getId().equals(request.getLockerId())) {
+            throw new AppException(ErrorCode.COMPARTMENT_NOT_FOUND);
+        }
+
+        if (returnCompartment.getLocker().getStatus() != LockerStatus.ACTIVE) {
+            throw new AppException(ErrorCode.LOCKER_NOT_ACTIVE);
+        }
+
+        if (returnCompartment.getStatus() != CompartmentStatus.AVAILABLE) {
+            throw new AppException(ErrorCode.NO_AVAILABLE_COMPARTMENT);
+        }
+
+        returnCompartment.setStatus(CompartmentStatus.RESERVED);
+        compartmentRepository.save(returnCompartment);
+
+        order.setReturnCompartment(returnCompartment);
+        order.setStatus(OrderStatus.AWAITING_RETURN_DEPOSIT);
+
+        order = orderRepository.save(order);
+        return mapToOrderResponse(order);
+    }
+
+    @Transactional
+    public OrderResponse depositReturn(Long orderId, String buyerUsername) {
+        Order order = orderRepository.findByIdWithLock(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getBuyer().getUsername().equals(buyerUsername)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        if (order.getStatus() != OrderStatus.AWAITING_RETURN_DEPOSIT) {
+            throw new AppException(ErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        Compartment compartment = order.getReturnCompartment();
+        if (compartment == null) {
+            throw new AppException(ErrorCode.NO_AVAILABLE_COMPARTMENT);
+        }
+
+        Locker locker = lockLocker(compartment.getLocker().getId());
+        compartment = compartmentRepository.findByIdWithLock(compartment.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+        if (compartment.getStatus() != CompartmentStatus.RESERVED) {
+            throw new AppException(ErrorCode.INVALID_COMPARTMENT_STATUS);
+        }
+
+        // Simulate IoT drop-off operations
+        if (!mockLockerService.openForDeposit(locker, compartment)
+                || !mockLockerService.confirmItemDeposited(locker, compartment)) {
+            throw new AppException(ErrorCode.MOCK_IOT_DEVICE_ERROR);
+        }
+
+        compartment.setStatus(CompartmentStatus.OCCUPIED);
+        compartmentRepository.save(compartment);
+
+        int codeInt = secureRandom.nextInt(1_000_000);
+        String rawReturnPickupCode = String.format("%06d", codeInt);
+
+        order.setReturnPickupCodeHash(passwordEncoder.encode(rawReturnPickupCode));
+        order.setEncryptedReturnPickupCode(aesEncryptionService.encrypt(rawReturnPickupCode));
+        order.setReturnDepositAt(LocalDateTime.now());
+        order.setStatus(OrderStatus.READY_FOR_RETURN_PICKUP);
+
+        order = orderRepository.save(order);
+
+        // Notify seller (item owner) that item was returned into locker
+        String subject = "CampusHub - Thông báo lấy lại đồ cho thuê: Đơn " + order.getOrderNumber();
+        String text = String.format(
+                "Xin chào %s,\n\nNgười thuê đã trả sản phẩm '%s' về tủ đồ.\n" +
+                "Địa điểm: %s (%s)\n" +
+                "Ngăn tủ: %s\n" +
+                "Mã mở tủ nhận lại đồ của bạn là: %s\n\n" +
+                "Vui lòng đến kiểm tra và nhận lại sản phẩm.",
+                order.getSeller().getFullName(),
+                order.getProduct().getTitle(),
+                locker.getName(),
+                locker.getLocation(),
+                compartment.getCode(),
+                rawReturnPickupCode
+        );
+        sendEmailAfterCommit(order.getSeller().getEmail(), subject, text);
+
+        return mapToOrderResponse(order);
+    }
+
+    @Transactional(noRollbackFor = PickupValidationException.class)
+    public OrderResponse pickupReturn(Long orderId, OrderPickupRequest request, String sellerUsername) {
+        Order order = orderRepository.findByIdWithLock(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getSeller().getUsername().equals(sellerUsername)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        if (order.getStatus() != OrderStatus.READY_FOR_RETURN_PICKUP) {
+            throw new AppException(ErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        if (order.getReturnPickupCodeHash() == null || !passwordEncoder.matches(request.getPickupCode(), order.getReturnPickupCodeHash())) {
+            throw new PickupValidationException(ErrorCode.INVALID_PICKUP_CODE);
+        }
+
+        Compartment compartment = order.getReturnCompartment();
+        if (compartment == null) {
+            throw new AppException(ErrorCode.COMPARTMENT_NOT_FOUND);
+        }
+        Locker locker = lockLocker(compartment.getLocker().getId());
+        compartment = compartmentRepository.findByIdWithLock(compartment.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+
+        if (compartment.getStatus() != CompartmentStatus.OCCUPIED) {
+            throw new AppException(ErrorCode.INVALID_COMPARTMENT_STATUS);
+        }
+
+        if (!mockLockerService.openForPickup(locker, compartment)
+                || !mockLockerService.confirmItemPickedUp(locker, compartment)) {
+            throw new AppException(ErrorCode.MOCK_IOT_DEVICE_ERROR);
+        }
+
+        compartment.setStatus(CompartmentStatus.AVAILABLE);
+        compartmentRepository.save(compartment);
+
+        order.setStatus(OrderStatus.COMPLETED);
+        order.setReturnPickedUpAt(LocalDateTime.now());
+        order.setEncryptedReturnPickupCode(null);
+        order.setReturnPickupCodeHash(null);
+
+        Product product = order.getProduct();
+        product.setStatus(ProductStatus.ACTIVE);
+        productRepository.save(product);
+
+        order = orderRepository.save(order);
+
+        // Notify buyer that deposit refund/settlement is completed
+        String subject = "CampusHub - Hoàn tất trả đồ thuê: Đơn " + order.getOrderNumber();
+        String text = String.format(
+                "Xin chào %s,\n\nChủ đồ đã nhận lại sản phẩm '%s'. Đơn thuê của bạn đã hoàn tất.\n" +
+                "Tiền cọc (nếu có: %s VNĐ) đã được hoàn trả.\n\nCảm ơn bạn đã sử dụng CampusHub!",
+                order.getBuyer().getFullName(),
+                product.getTitle(),
+                order.getDepositAmount() != null ? order.getDepositAmount().toString() : "0"
+        );
+        sendEmailAfterCommit(order.getBuyer().getEmail(), subject, text);
+
         return mapToOrderResponse(order);
     }
 

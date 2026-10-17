@@ -36,6 +36,25 @@ public class Order extends BaseEntity {
     @Column(name = "status", nullable = false, length = 30)
     private OrderStatus status = OrderStatus.PENDING_SELLER;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type", nullable = false, length = 20)
+    private OrderType orderType = OrderType.PURCHASE;
+
+    @Column(name = "rental_duration_days")
+    private Integer rentalDurationDays;
+
+    @Column(name = "due_return_at")
+    private LocalDateTime dueReturnAt;
+
+    @Column(name = "deposit_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal depositAmount = BigDecimal.ZERO;
+
+    @Column(name = "platform_fee", nullable = false, precision = 12, scale = 2)
+    private BigDecimal platformFee = BigDecimal.ZERO;
+
+    @Column(name = "seller_payout", nullable = false, precision = 12, scale = 2)
+    private BigDecimal sellerPayout = BigDecimal.ZERO;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "locker_id")
     private Locker locker;
@@ -61,6 +80,22 @@ public class Order extends BaseEntity {
 
     @Column(name = "picked_up_at")
     private LocalDateTime pickedUpAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "return_compartment_id")
+    private Compartment returnCompartment;
+
+    @Column(name = "return_pickup_code_hash")
+    private String returnPickupCodeHash;
+
+    @Column(name = "encrypted_return_pickup_code")
+    private String encryptedReturnPickupCode;
+
+    @Column(name = "return_deposit_at")
+    private LocalDateTime returnDepositAt;
+
+    @Column(name = "return_picked_up_at")
+    private LocalDateTime returnPickedUpAt;
 
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
@@ -217,5 +252,93 @@ public class Order extends BaseEntity {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    public OrderType getOrderType() {
+        return orderType;
+    }
+
+    public void setOrderType(OrderType orderType) {
+        this.orderType = orderType;
+    }
+
+    public Integer getRentalDurationDays() {
+        return rentalDurationDays;
+    }
+
+    public void setRentalDurationDays(Integer rentalDurationDays) {
+        this.rentalDurationDays = rentalDurationDays;
+    }
+
+    public LocalDateTime getDueReturnAt() {
+        return dueReturnAt;
+    }
+
+    public void setDueReturnAt(LocalDateTime dueReturnAt) {
+        this.dueReturnAt = dueReturnAt;
+    }
+
+    public BigDecimal getDepositAmount() {
+        return depositAmount;
+    }
+
+    public void setDepositAmount(BigDecimal depositAmount) {
+        this.depositAmount = depositAmount;
+    }
+
+    public BigDecimal getPlatformFee() {
+        return platformFee;
+    }
+
+    public void setPlatformFee(BigDecimal platformFee) {
+        this.platformFee = platformFee;
+    }
+
+    public BigDecimal getSellerPayout() {
+        return sellerPayout;
+    }
+
+    public void setSellerPayout(BigDecimal sellerPayout) {
+        this.sellerPayout = sellerPayout;
+    }
+
+    public Compartment getReturnCompartment() {
+        return returnCompartment;
+    }
+
+    public void setReturnCompartment(Compartment returnCompartment) {
+        this.returnCompartment = returnCompartment;
+    }
+
+    public String getReturnPickupCodeHash() {
+        return returnPickupCodeHash;
+    }
+
+    public void setReturnPickupCodeHash(String returnPickupCodeHash) {
+        this.returnPickupCodeHash = returnPickupCodeHash;
+    }
+
+    public String getEncryptedReturnPickupCode() {
+        return encryptedReturnPickupCode;
+    }
+
+    public void setEncryptedReturnPickupCode(String encryptedReturnPickupCode) {
+        this.encryptedReturnPickupCode = encryptedReturnPickupCode;
+    }
+
+    public LocalDateTime getReturnDepositAt() {
+        return returnDepositAt;
+    }
+
+    public void setReturnDepositAt(LocalDateTime returnDepositAt) {
+        this.returnDepositAt = returnDepositAt;
+    }
+
+    public LocalDateTime getReturnPickedUpAt() {
+        return returnPickedUpAt;
+    }
+
+    public void setReturnPickedUpAt(LocalDateTime returnPickedUpAt) {
+        this.returnPickedUpAt = returnPickedUpAt;
     }
 }
