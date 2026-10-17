@@ -622,20 +622,27 @@ public class OrderService {
             throw new AppException(ErrorCode.INVALID_ORDER_STATUS);
         }
 
-        Compartment returnCompartment = compartmentRepository.findByIdWithLock(request.getCompartmentId())
-                .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
-        entityManager.refresh(returnCompartment, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
-
-        if (!returnCompartment.getLocker().getId().equals(request.getLockerId())) {
-            throw new AppException(ErrorCode.COMPARTMENT_NOT_FOUND);
-        }
-
-        if (returnCompartment.getLocker().getStatus() != LockerStatus.ACTIVE) {
-            throw new AppException(ErrorCode.LOCKER_NOT_ACTIVE);
-        }
-
-        if (returnCompartment.getStatus() != CompartmentStatus.AVAILABLE) {
-            throw new AppException(ErrorCode.NO_AVAILABLE_COMPARTMENT);
+        Locker locker = lockLocker(request.getLockerId());
+        Compartment returnCompartment;
+        if (request.getCompartmentId() != null) {
+            returnCompartment = compartmentRepository.findByIdWithLock(request.getCompartmentId())
+                    .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+            entityManager.refresh(returnCompartment, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            if (!returnCompartment.getLocker().getId().equals(locker.getId())) {
+                throw new AppException(ErrorCode.COMPARTMENT_NOT_FOUND);
+            }
+            if (returnCompartment.getStatus() != CompartmentStatus.AVAILABLE) {
+                throw new AppException(ErrorCode.NO_AVAILABLE_COMPARTMENT);
+            }
+        } else {
+            Compartment candidate = compartmentRepository.findFirstByLockerIdAndStatus(locker.getId(), CompartmentStatus.AVAILABLE)
+                    .orElseThrow(() -> new AppException(ErrorCode.NO_AVAILABLE_COMPARTMENT));
+            returnCompartment = compartmentRepository.findByIdWithLock(candidate.getId())
+                    .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
+            entityManager.refresh(returnCompartment, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            if (returnCompartment.getStatus() != CompartmentStatus.AVAILABLE) {
+                throw new AppException(ErrorCode.NO_AVAILABLE_COMPARTMENT);
+            }
         }
 
         returnCompartment.setStatus(CompartmentStatus.RESERVED);

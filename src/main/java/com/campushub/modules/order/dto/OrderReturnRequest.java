@@ -7,7 +7,6 @@ public class OrderReturnRequest {
     @NotNull(message = "Locker ID is required")
     private Long lockerId;
 
-    @NotNull(message = "Compartment ID is required")
     private Long compartmentId;
 
     public Long getLockerId() {
