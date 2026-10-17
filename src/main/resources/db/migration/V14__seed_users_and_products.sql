@@ -4,29 +4,30 @@
 -- BCrypt hash for 'admin123': $2a$10$c7TjWP1/jqL3d.sQbNi/0unarUE15/78gJTZCZOC4x2bysBn6Mz7u
 INSERT INTO users (
     username, email, password_hash, full_name, role, status,
-    date_of_birth, identity_verified, citizen_id, identity_verified_at, created_at, updated_at
+    date_of_birth, identity_verified, citizen_id, identity_verified_at, identity_reviewed_at, created_at, updated_at
 ) VALUES 
 (
     'user01', 'user01@campushub.com',
     '$2a$10$c7TjWP1/jqL3d.sQbNi/0unarUE15/78gJTZCZOC4x2bysBn6Mz7u',
     'Nguyễn Văn An (K64)', 'STUDENT', 'ACTIVE',
-    '2003-05-15', TRUE, '001201000001', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    '2003-05-15', TRUE, '001201000001', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 ),
 (
     'user02', 'user02@campushub.com',
     '$2a$10$c7TjWP1/jqL3d.sQbNi/0unarUE15/78gJTZCZOC4x2bysBn6Mz7u',
     'Trần Thị Mai (K65)', 'STUDENT', 'ACTIVE',
-    '2004-08-20', TRUE, '001201000002', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    '2004-08-20', TRUE, '001201000002', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 ),
 (
     'user03', 'user03@campushub.com',
     '$2a$10$c7TjWP1/jqL3d.sQbNi/0unarUE15/78gJTZCZOC4x2bysBn6Mz7u',
     'Lê Hoàng Nam (K63)', 'STUDENT', 'ACTIVE',
-    '2002-11-10', TRUE, '001201000003', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    '2002-11-10', TRUE, '001201000003', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 )
 ON CONFLICT (username) DO UPDATE SET
     password_hash = EXCLUDED.password_hash,
     identity_verified = TRUE,
+    identity_reviewed_at = CURRENT_TIMESTAMP,
     status = 'ACTIVE',
     updated_at = CURRENT_TIMESTAMP;
 
