@@ -14,8 +14,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
-import vn.payos.model.webhooks.Webhook;
-import vn.payos.model.webhooks.WebhookData;
 
 import java.time.LocalDateTime;
 import java.util.Map;

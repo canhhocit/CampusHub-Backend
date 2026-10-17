@@ -26,8 +26,6 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import vn.payos.model.webhooks.Webhook;
-import vn.payos.model.webhooks.WebhookData;
 
 import java.math.BigDecimal;
 

@@ -19,7 +19,7 @@ import com.campushub.modules.order.dto.*;
 import com.campushub.modules.order.entity.*;
 import com.campushub.modules.order.repository.OrderRepository;
 import com.campushub.modules.order.service.*;
-import com.campushub.modules.user.dto.VerifyIdentityRequest;
+import com.campushub.modules.user.dto.*;
 import com.campushub.modules.user.entity.User;
 import com.campushub.modules.user.repository.UserRepository;
 import com.campushub.modules.user.service.UserService;
@@ -267,7 +267,7 @@ class BusinessRegressionTest {
     }
 
     @Test void concurrentProfileUpdateCannotUndoSuspension() throws Exception {
-        var request = new com.campushub.modules.user.dto.UpdateProfileRequest(); request.setFullName("Updated Name");
+        UpdateProfileRequest request = new UpdateProfileRequest(); request.setFullName("Updated Name");
         race(() -> userService.updateProfile("buyer", request),
                 () -> adminService.updateUserStatus(buyer.getId(), UserStatus.LOCKED, "Test suspension"));
         User updated = users.findById(buyer.getId()).orElseThrow();
