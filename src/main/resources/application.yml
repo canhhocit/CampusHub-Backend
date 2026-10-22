@@ -70,5 +70,9 @@ app:
     enabled: ${SELF_PING_ENABLED:true}
     url: ${SELF_PING_URL:${RENDER_EXTERNAL_URL:}}
     interval-ms: ${SELF_PING_INTERVAL_MS:300000}
+  ocr:
+    base-url: ${OCR_SERVICE_URL:http://localhost:8081}
+    connect-timeout-ms: ${OCR_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${OCR_READ_TIMEOUT_MS:8000}
 
 
