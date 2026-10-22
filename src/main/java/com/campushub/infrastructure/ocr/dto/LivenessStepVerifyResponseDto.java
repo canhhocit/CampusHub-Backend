@@ -7,6 +7,11 @@ import java.util.Map;
 
 /**
  * Maps LivenessStepVerifyResponse in app/schemas/liveness.py from POST /api/v1/liveness/session/{session_id}/verify-step.
+ *
+ * NOTE ON LIVENESS & PAD EVALUATION:
+ * - A single step passing does NOT mean the entire session is verified (check isAllPassed() and status == PASSED).
+ * - Active challenge compliance (yaw movement) can NEVER bypass passive PAD: if anti_spoofing_outcome != LIVE,
+ *   the step is not considered genuinely live.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class LivenessStepVerifyResponseDto {
@@ -26,7 +31,7 @@ public class LivenessStepVerifyResponseDto {
     @JsonProperty("all_passed")
     private Boolean allPassed;
 
-    private String status;
+    private LivenessSessionStatus status;
 
     @JsonProperty("next_challenge")
     private ChallengeInfoDto nextChallenge;
@@ -39,7 +44,7 @@ public class LivenessStepVerifyResponseDto {
     private Map<String, Object> metrics;
 
     @JsonProperty("anti_spoofing_outcome")
-    private String antiSpoofingOutcome;
+    private AntiSpoofingOutcome antiSpoofingOutcome;
 
     public LivenessStepVerifyResponseDto() {
     }
@@ -84,11 +89,11 @@ public class LivenessStepVerifyResponseDto {
         this.allPassed = allPassed;
     }
 
-    public String getStatus() {
-        return status;
+    public LivenessSessionStatus getStatus() {
+        return status != null ? status : LivenessSessionStatus.UNKNOWN;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(LivenessSessionStatus status) {
         this.status = status;
     }
 
@@ -124,11 +129,33 @@ public class LivenessStepVerifyResponseDto {
         this.metrics = metrics;
     }
 
-    public String getAntiSpoofingOutcome() {
-        return antiSpoofingOutcome;
+    public AntiSpoofingOutcome getAntiSpoofingOutcome() {
+        return antiSpoofingOutcome != null ? antiSpoofingOutcome : AntiSpoofingOutcome.UNKNOWN;
     }
 
-    public void setAntiSpoofingOutcome(String antiSpoofingOutcome) {
+    public void setAntiSpoofingOutcome(AntiSpoofingOutcome antiSpoofingOutcome) {
         this.antiSpoofingOutcome = antiSpoofingOutcome;
+    }
+
+    /**
+     * Fail-closed check: Step is only successful if step_passed is true AND anti_spoofing_outcome is LIVE.
+     */
+    public boolean isStepSuccessful() {
+        return Boolean.TRUE.equals(stepPassed)
+                && antiSpoofingOutcome == AntiSpoofingOutcome.LIVE;
+    }
+
+    /**
+     * Strict check for complete session success: all_passed is true, session status is PASSED,
+     * and anti_spoofing_outcome is LIVE.
+     */
+    public boolean isSessionFullyPassed() {
+        return Boolean.TRUE.equals(allPassed)
+                && status == LivenessSessionStatus.PASSED
+                && antiSpoofingOutcome == AntiSpoofingOutcome.LIVE;
+    }
+
+    public boolean isSpoofDetected() {
+        return antiSpoofingOutcome == AntiSpoofingOutcome.SPOOF;
     }
 }

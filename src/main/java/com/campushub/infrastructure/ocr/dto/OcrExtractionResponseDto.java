@@ -14,12 +14,19 @@ import java.util.Map;
 public class OcrExtractionResponseDto {
 
     private boolean success;
-    private String side;
+    private CardSide side;
 
     @JsonProperty("processing_time_ms")
     private Double processingTimeMs;
 
     private Map<String, ExtractedFieldDto> fields;
+
+    @JsonProperty("raw_detections")
+    private List<RawDetectionDto> rawDetections;
+
+    @JsonProperty("image_info")
+    private ImageMetadataDto imageInfo;
+
     private List<String> warnings;
     private String disclaimer;
 
@@ -34,11 +41,11 @@ public class OcrExtractionResponseDto {
         this.success = success;
     }
 
-    public String getSide() {
-        return side;
+    public CardSide getSide() {
+        return side != null ? side : CardSide.UNKNOWN;
     }
 
-    public void setSide(String side) {
+    public void setSide(CardSide side) {
         this.side = side;
     }
 
@@ -58,6 +65,22 @@ public class OcrExtractionResponseDto {
         this.fields = fields;
     }
 
+    public List<RawDetectionDto> getRawDetections() {
+        return rawDetections != null ? rawDetections : Collections.emptyList();
+    }
+
+    public void setRawDetections(List<RawDetectionDto> rawDetections) {
+        this.rawDetections = rawDetections;
+    }
+
+    public ImageMetadataDto getImageInfo() {
+        return imageInfo;
+    }
+
+    public void setImageInfo(ImageMetadataDto imageInfo) {
+        this.imageInfo = imageInfo;
+    }
+
     public List<String> getWarnings() {
         return warnings != null ? warnings : Collections.emptyList();
     }
@@ -72,5 +95,16 @@ public class OcrExtractionResponseDto {
 
     public void setDisclaimer(String disclaimer) {
         this.disclaimer = disclaimer;
+    }
+
+    /**
+     * Helper to safely extract field value by key name (e.g. "idNumber", "fullName").
+     */
+    public String getFieldValue(String fieldKey) {
+        if (fields == null || fieldKey == null) {
+            return null;
+        }
+        ExtractedFieldDto field = fields.get(fieldKey);
+        return field != null ? field.getValue() : null;
     }
 }

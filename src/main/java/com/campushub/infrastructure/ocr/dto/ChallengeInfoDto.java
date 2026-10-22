@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ChallengeInfoDto {
 
-    private String action;
+    private ChallengeAction action;
     private String instruction;
     private Integer step;
 
@@ -22,11 +22,11 @@ public class ChallengeInfoDto {
     public ChallengeInfoDto() {
     }
 
-    public String getAction() {
-        return action;
+    public ChallengeAction getAction() {
+        return action != null ? action : ChallengeAction.UNKNOWN;
     }
 
-    public void setAction(String action) {
+    public void setAction(ChallengeAction action) {
         this.action = action;
     }
 

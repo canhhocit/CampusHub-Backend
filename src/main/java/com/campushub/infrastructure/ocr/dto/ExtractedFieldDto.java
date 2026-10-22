@@ -12,7 +12,7 @@ public class ExtractedFieldDto {
     private String name;
     private String label;
     private String value;
-    private String status;
+    private FieldStatus status;
     private Double confidence;
 
     @JsonProperty("extraction_confidence")
@@ -51,12 +51,16 @@ public class ExtractedFieldDto {
         this.value = value;
     }
 
-    public String getStatus() {
-        return status;
+    public FieldStatus getStatus() {
+        return status != null ? status : FieldStatus.UNKNOWN;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(FieldStatus status) {
         this.status = status;
+    }
+
+    public boolean isExtracted() {
+        return status != null && status.isExtracted();
     }
 
     public Double getConfidence() {

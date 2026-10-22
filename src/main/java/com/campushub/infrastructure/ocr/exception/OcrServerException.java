@@ -28,6 +28,30 @@ public class OcrServerException extends OcrIntegrationException {
         return responseBody;
     }
 
+    public boolean isBadRequest() {
+        return statusCode == 400;
+    }
+
+    public boolean isNotFound() {
+        return statusCode == 404;
+    }
+
+    public boolean isPayloadTooLarge() {
+        return statusCode == 413;
+    }
+
+    public boolean isValidationError() {
+        return statusCode == 422;
+    }
+
+    public boolean isServiceUnavailable() {
+        return statusCode == 503;
+    }
+
+    public boolean isServerError() {
+        return statusCode >= 500;
+    }
+
     private static String sanitizeResponseBody(String raw) {
         if (raw == null) {
             return "";

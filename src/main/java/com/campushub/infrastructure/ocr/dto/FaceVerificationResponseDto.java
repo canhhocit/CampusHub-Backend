@@ -8,6 +8,12 @@ import java.util.List;
 
 /**
  * Maps FaceVerificationResponse in app/schemas/face.py from POST /api/v1/face/verify.
+ *
+ * NOTE ON BIOMETRIC INTERPRETATION:
+ * - success = true indicates the computer vision pipeline ran without runtime crashes.
+ * - match = true indicates similarity_score >= threshold.
+ * - success == true does NOT mean match == true.
+ * - similarity_score and confidence_score are geometric heuristic scores, NOT calibrated posterior probabilities.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class FaceVerificationResponseDto {
@@ -22,6 +28,12 @@ public class FaceVerificationResponseDto {
     private Double confidenceScore;
 
     private Double threshold;
+
+    @JsonProperty("card_face")
+    private FaceDetectionResultDto cardFace;
+
+    @JsonProperty("selfie_face")
+    private FaceDetectionResultDto selfieFace;
 
     @JsonProperty("pipeline_state")
     private String pipelineState;
@@ -52,6 +64,13 @@ public class FaceVerificationResponseDto {
         this.match = match;
     }
 
+    /**
+     * Strict check requiring both successful pipeline execution and verified biometric match.
+     */
+    public boolean isVerifiedMatch() {
+        return success && match;
+    }
+
     public Double getSimilarityScore() {
         return similarityScore;
     }
@@ -74,6 +93,22 @@ public class FaceVerificationResponseDto {
 
     public void setThreshold(Double threshold) {
         this.threshold = threshold;
+    }
+
+    public FaceDetectionResultDto getCardFace() {
+        return cardFace;
+    }
+
+    public void setCardFace(FaceDetectionResultDto cardFace) {
+        this.cardFace = cardFace;
+    }
+
+    public FaceDetectionResultDto getSelfieFace() {
+        return selfieFace;
+    }
+
+    public void setSelfieFace(FaceDetectionResultDto selfieFace) {
+        this.selfieFace = selfieFace;
     }
 
     public String getPipelineState() {

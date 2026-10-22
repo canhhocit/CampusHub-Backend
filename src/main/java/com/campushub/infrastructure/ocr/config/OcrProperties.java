@@ -56,6 +56,20 @@ public class OcrProperties {
         return readTimeoutMs;
     }
 
+    /**
+     * Server-approved threshold for face matching (Cosine similarity threshold in [-1.0, 1.0]).
+     * Default: 0.363 (recommended standard by OpenCV Zoo SFace).
+     */
+    private Double faceMatchThreshold = 0.363;
+
+    public Double getFaceMatchThreshold() {
+        return faceMatchThreshold;
+    }
+
+    public void setFaceMatchThreshold(Double faceMatchThreshold) {
+        this.faceMatchThreshold = faceMatchThreshold;
+    }
+
     public void setReadTimeoutMs(int readTimeoutMs) {
         this.readTimeoutMs = readTimeoutMs;
     }
