@@ -22,6 +22,12 @@ public class ChallengeInfoDto {
     public ChallengeInfoDto() {
     }
 
+    public ChallengeInfoDto(ChallengeAction action, String instruction, Integer timeoutSeconds) {
+        this.action = action;
+        this.instruction = instruction;
+        this.timeoutSeconds = timeoutSeconds;
+    }
+
     public ChallengeAction getAction() {
         return action != null ? action : ChallengeAction.UNKNOWN;
     }

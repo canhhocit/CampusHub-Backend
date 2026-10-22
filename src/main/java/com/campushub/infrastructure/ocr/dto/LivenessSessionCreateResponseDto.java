@@ -29,6 +29,16 @@ public class LivenessSessionCreateResponseDto {
     public LivenessSessionCreateResponseDto() {
     }
 
+    public LivenessSessionCreateResponseDto(String sessionId, Double createdAt, Integer expiresInSeconds,
+                                           Integer totalSteps, Integer currentStep, ChallengeInfoDto challenge) {
+        this.sessionId = sessionId;
+        this.createdAt = createdAt;
+        this.expiresInSeconds = expiresInSeconds;
+        this.totalSteps = totalSteps;
+        this.currentStep = currentStep;
+        this.challenge = challenge;
+    }
+
     public String getSessionId() {
         return sessionId;
     }

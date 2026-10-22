@@ -27,6 +27,12 @@ public class ExtractedFieldDto {
     public ExtractedFieldDto() {
     }
 
+    public ExtractedFieldDto(String value, Double confidence, FieldStatus status) {
+        this.value = value;
+        this.confidence = confidence;
+        this.status = status;
+    }
+
     public String getName() {
         return name;
     }

@@ -48,6 +48,20 @@ public class FaceVerificationResponseDto {
     public FaceVerificationResponseDto() {
     }
 
+    public FaceVerificationResponseDto(boolean success, boolean match, Double similarityScore,
+                                      Double confidenceScore, Double threshold,
+                                      FaceDetectionResultDto cardFace, FaceDetectionResultDto selfieFace,
+                                      Double processingTimeMs) {
+        this.success = success;
+        this.match = match;
+        this.similarityScore = similarityScore;
+        this.confidenceScore = confidenceScore;
+        this.threshold = threshold;
+        this.cardFace = cardFace;
+        this.selfieFace = selfieFace;
+        this.processingTimeMs = processingTimeMs;
+    }
+
     public boolean isSuccess() {
         return success;
     }
@@ -57,6 +71,10 @@ public class FaceVerificationResponseDto {
     }
 
     public boolean isMatch() {
+        return match;
+    }
+
+    public Boolean getMatch() {
         return match;
     }
 

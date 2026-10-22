@@ -107,4 +107,14 @@ public class OcrExtractionResponseDto {
         ExtractedFieldDto field = fields.get(fieldKey);
         return field != null ? field.getValue() : null;
     }
+
+    /**
+     * Helper to extract citizen ID (CCCD number) from field aliases.
+     */
+    public String getCitizenId() {
+        String id = getFieldValue("id");
+        if (id == null) id = getFieldValue("id_number");
+        if (id == null) id = getFieldValue("idNumber");
+        return id;
+    }
 }

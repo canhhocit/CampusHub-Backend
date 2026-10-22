@@ -74,5 +74,10 @@ app:
     base-url: ${OCR_SERVICE_URL:http://localhost:8081}
     connect-timeout-ms: ${OCR_CONNECT_TIMEOUT_MS:2000}
     read-timeout-ms: ${OCR_READ_TIMEOUT_MS:8000}
+  identity:
+    max-daily-attempts: ${IDENTITY_MAX_DAILY_ATTEMPTS:5}
+    attempt-ttl-minutes: ${IDENTITY_ATTEMPT_TTL_MINUTES:15}
+    max-steps-per-attempt: ${IDENTITY_MAX_STEPS_PER_ATTEMPT:10}
+
 
 

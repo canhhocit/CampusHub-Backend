@@ -1,0 +1,15 @@
+package com.campushub.modules.identity.enums;
+
+public enum VerificationFailureCode {
+    OCR_EXTRACT_FAILED,
+    INVALID_CITIZEN_ID,
+    CITIZEN_ID_DUPLICATE,
+    LIVENESS_SPOOF_DETECTED,
+    LIVENESS_FAILED,
+    LIVENESS_TIMEOUT,
+    CARD_HASH_MISMATCH,
+    FACE_MISMATCH,
+    ATTEMPT_EXPIRED,
+    RATE_LIMIT_EXCEEDED,
+    SYSTEM_ERROR
+}

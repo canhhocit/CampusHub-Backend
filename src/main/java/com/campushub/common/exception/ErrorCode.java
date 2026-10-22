@@ -51,7 +51,17 @@ public enum ErrorCode {
     VIDEO_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "Dung lượng video vượt quá giới hạn tối đa cho phép"),
     ORDER_ALREADY_PAID(HttpStatus.BAD_REQUEST, "Đơn hàng này đã được thanh toán"),
     INVALID_PAYMENT_STATUS(HttpStatus.BAD_REQUEST, "Trạng thái thanh toán không hợp lệ"),
-    PAYMENT_FAILED(HttpStatus.BAD_REQUEST, "Giao dịch thanh toán không thành công");
+    PAYMENT_FAILED(HttpStatus.BAD_REQUEST, "Giao dịch thanh toán không thành công"),
+    IDENTITY_ATTEMPT_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy phiên xác minh danh tính"),
+    IDENTITY_ATTEMPT_EXPIRED(HttpStatus.BAD_REQUEST, "Phiên xác minh danh tính đã hết hạn"),
+    IDENTITY_ATTEMPT_INVALID_STATE(HttpStatus.BAD_REQUEST, "Trạng thái phiên xác minh không hợp lệ cho thao tác này"),
+    IDENTITY_OCR_FAILED(HttpStatus.BAD_REQUEST, "Không thể trích xuất thông tin hợp lệ từ ảnh thẻ CCCD"),
+    IDENTITY_LIVENESS_FAILED(HttpStatus.BAD_REQUEST, "Xác minh chuyển động khuôn mặt hoặc chống giả mạo (PAD) không đạt"),
+    IDENTITY_FACE_MISMATCH(HttpStatus.BAD_REQUEST, "Khuôn mặt selfie không trùng khớp với ảnh trên thẻ CCCD"),
+    IDENTITY_CARD_MISMATCH(HttpStatus.BAD_REQUEST, "Ảnh thẻ CCCD cung cấp không trùng khớp với ảnh đã trích xuất ban đầu"),
+    IDENTITY_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Bạn đã vượt quá số lần thử xác minh trong ngày. Vui lòng thử lại sau."),
+    IDENTITY_VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "Vui lòng hoàn thành luồng xác minh eKYC trực tuyến (OCR, Liveness, Face Match)."),
+    IDENTITY_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dịch vụ nhận diện sinh trắc học hiện không khả dụng. Vui lòng thử lại sau.");
 
     private final HttpStatus status;
     private final String message;
