@@ -32,8 +32,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import com.campushub.modules.identity.enums.VerificationFailureCode;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -84,11 +87,11 @@ public class IdentityIntegrationTest {
     @BeforeEach
     void setUp() {
         attemptRepository.deleteAll();
-        userRepository.deleteAll();
 
+        String uid = UUID.randomUUID().toString().substring(0, 8);
         testUser = new User();
-        testUser.setUsername("testuser_ekyc");
-        testUser.setEmail("ekyc@test.com");
+        testUser.setUsername("user_ekyc_" + uid);
+        testUser.setEmail("ekyc_" + uid + "@test.com");
         testUser.setPasswordHash("hashed_secret");
         testUser.setFullName("Nguyễn Văn A");
         testUser.setRole(Role.USER);
@@ -236,7 +239,7 @@ public class IdentityIntegrationTest {
                     .connectTimeout(Duration.ofMillis(500))
                     .build();
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("http://localhost:8081/health"))
+                    .uri(URI.create("http://localhost:8081/api/v1/health"))
                     .timeout(Duration.ofMillis(500))
                     .GET()
                     .build();
@@ -248,10 +251,170 @@ public class IdentityIntegrationTest {
 
         Assumptions.assumeTrue(
                 serviceAvailable,
-                "Real OCR service is NOT running on http://localhost:8081. Skipping real smoke test."
+                "Real OCR service is NOT running on http://localhost:8081/api/v1/health. Skipping real smoke test."
         );
 
         // If available, verify real health endpoint
         assertTrue(serviceAvailable);
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @DisplayName("Bảo đảm failed attempt được lưu vào DB khi OCR trích xuất thất bại")
+    void testFailedAttemptSavedOnOcrFailure() throws Exception {
+        attemptRepository.deleteAll();
+
+        OcrExtractionResponseDto failedDto = new OcrExtractionResponseDto();
+        failedDto.setSuccess(false);
+        when(ocrClient.extractCard(any(), any(), eq(CardSide.FRONT), eq(true))).thenReturn(failedDto);
+
+        MockMultipartFile cardFile = new MockMultipartFile(
+                "card_file", "bad_cccd.jpg", "image/jpeg", validJpegBytes
+        );
+
+        mockMvc.perform(
+                multipart("/api/v1/identity/attempts/start")
+                        .file(cardFile)
+                        .header("Authorization", "Bearer " + userToken)
+        )
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("IDENTITY_OCR_FAILED"));
+
+        List<IdentityVerificationAttempt> attempts = attemptRepository.findAll();
+        assertEquals(1, attempts.size(), "Failed attempt must be persisted in database");
+        assertEquals(VerificationAttemptStatus.REJECTED, attempts.get(0).getStatus());
+        assertEquals(VerificationFailureCode.OCR_EXTRACT_FAILED, attempts.get(0).getFailureCode());
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @DisplayName("Bảo đảm failed attempt được lưu khi phát hiện giả mạo khuôn mặt (Spoof)")
+    void testFailedAttemptSavedOnSpoofDetection() throws Exception {
+        attemptRepository.deleteAll();
+
+        // 1. Start attempt successfully
+        OcrExtractionResponseDto ocrDto = new OcrExtractionResponseDto();
+        ocrDto.setSuccess(true);
+        ocrDto.setFields(Map.of("id", new ExtractedFieldDto("079123456789", 0.99, FieldStatus.EXTRACTED)));
+        when(ocrClient.extractCard(any(), any(), eq(CardSide.FRONT), eq(true))).thenReturn(ocrDto);
+
+        LivenessSessionCreateResponseDto sessionDto = new LivenessSessionCreateResponseDto(
+                "sess-spoof", 1729600000.0, 900, 2, 0,
+                new ChallengeInfoDto(ChallengeAction.TURN_HEAD_LEFT, "Quay trái", 10)
+        );
+        when(ocrClient.createLivenessSession()).thenReturn(sessionDto);
+
+        MockMultipartFile cardFile = new MockMultipartFile(
+                "card_file", "cccd_front.jpg", "image/jpeg", validJpegBytes
+        );
+
+        MvcResult startResult = mockMvc.perform(
+                multipart("/api/v1/identity/attempts/start")
+                        .file(cardFile)
+                        .header("Authorization", "Bearer " + userToken)
+        )
+        .andExpect(status().isOk())
+        .andReturn();
+
+        StartVerificationResponseDto startRes = objectMapper.readValue(
+                startResult.getResponse().getContentAsString(), StartVerificationResponseDto.class
+        );
+        String attemptId = startRes.getAttemptId();
+
+        // 2. Submit liveness-step with spoof detected
+        LivenessStepVerifyResponseDto spoofDto = new LivenessStepVerifyResponseDto();
+        spoofDto.setCurrentStep(0);
+        spoofDto.setStepPassed(false);
+        spoofDto.setAllPassed(false);
+        spoofDto.setAntiSpoofingOutcome(AntiSpoofingOutcome.SPOOF);
+        spoofDto.setStatus(LivenessSessionStatus.FAILED);
+        when(ocrClient.verifyLivenessStep(eq("sess-spoof"), anyList())).thenReturn(spoofDto);
+
+        MockMultipartFile frame = new MockMultipartFile("frames", "f1.jpg", "image/jpeg", validJpegBytes);
+        mockMvc.perform(
+                multipart("/api/v1/identity/attempts/" + attemptId + "/liveness-step")
+                        .file(frame)
+                        .header("Authorization", "Bearer " + userToken)
+        )
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("IDENTITY_LIVENESS_FAILED"));
+
+        IdentityVerificationAttempt attemptInDb = attemptRepository.findByAttemptId(attemptId).orElseThrow();
+        assertEquals(VerificationAttemptStatus.REJECTED, attemptInDb.getStatus());
+        assertEquals(VerificationFailureCode.LIVENESS_SPOOF_DETECTED, attemptInDb.getFailureCode());
+        assertEquals("SPOOF", attemptInDb.getAntiSpoofingOutcome());
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @DisplayName("Bảo đảm phát hiện và lưu failed attempt khi ảnh CCCD ở verify-face khác ảnh ở bước 1")
+    void testCardHashMismatchSavedOnVerifyFace() throws Exception {
+        attemptRepository.deleteAll();
+
+        // 1. Setup attempt at LIVENESS_PASSED state
+        IdentityVerificationAttempt attempt = new IdentityVerificationAttempt();
+        attempt.setAttemptId("att-hash-test");
+        attempt.setUser(testUser);
+        attempt.setStatus(VerificationAttemptStatus.LIVENESS_PASSED);
+        attempt.setLivenessSessionId("sess-test");
+        attempt.setCitizenId("079123456789");
+        attempt.setCardPhotoHash("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"); // Different hash
+        attempt.setStartedAt(LocalDateTime.now());
+        attempt.setExpiresAt(LocalDateTime.now().plusMinutes(15));
+        attempt.setLivenessPassed(true);
+        attemptRepository.save(attempt);
+
+        MockMultipartFile cardFile = new MockMultipartFile("card_file", "card.jpg", "image/jpeg", validJpegBytes);
+        MockMultipartFile selfieFile = new MockMultipartFile("selfie_file", "selfie.jpg", "image/jpeg", validJpegBytes);
+
+        mockMvc.perform(
+                multipart("/api/v1/identity/attempts/att-hash-test/verify-face")
+                        .file(cardFile)
+                        .file(selfieFile)
+                        .header("Authorization", "Bearer " + userToken)
+        )
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("IDENTITY_CARD_MISMATCH"));
+
+        IdentityVerificationAttempt failedAttempt = attemptRepository.findByAttemptId("att-hash-test").orElseThrow();
+        assertEquals(VerificationAttemptStatus.REJECTED, failedAttempt.getStatus());
+        assertEquals(VerificationFailureCode.CARD_HASH_MISMATCH, failedAttempt.getFailureCode());
+    }
+
+    @Test
+    @DisplayName("Kiểm tra phân quyền: User khác không thể truy cập hoặc thao tác trên attempt")
+    void testNonOwnerCannotAccessOrAdvanceAttempt() throws Exception {
+        // Create another user with unique username
+        String otherUid = UUID.randomUUID().toString().substring(0, 8);
+        User otherUser = new User();
+        otherUser.setUsername("other_" + otherUid);
+        otherUser.setEmail("other_" + otherUid + "@test.com");
+        otherUser.setPasswordHash("hashed");
+        otherUser.setFullName("Other User");
+        otherUser.setRole(Role.USER);
+        otherUser.setStatus(UserStatus.ACTIVE);
+        otherUser = userRepository.save(otherUser);
+
+        String otherToken = jwtTokenProvider.generateAccessTokenFromUsernameAndIdAndRole(
+                otherUser.getUsername(), otherUser.getId(), "ROLE_USER"
+        );
+
+        // Attempt belongs to testUser
+        IdentityVerificationAttempt attempt = new IdentityVerificationAttempt();
+        attempt.setAttemptId("att-ownership-test");
+        attempt.setUser(testUser);
+        attempt.setStatus(VerificationAttemptStatus.LIVENESS_IN_PROGRESS);
+        attempt.setLivenessSessionId("sess-test");
+        attempt.setStartedAt(LocalDateTime.now());
+        attempt.setExpiresAt(LocalDateTime.now().plusMinutes(15));
+        attemptRepository.save(attempt);
+
+        // Other user attempts to get or submit
+        mockMvc.perform(
+                get("/api/v1/identity/attempts/att-ownership-test")
+                        .header("Authorization", "Bearer " + otherToken)
+        )
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error").value("UNAUTHORIZED_ACTION"));
     }
 }

@@ -63,7 +63,7 @@ public class IdentityVerificationService {
         this.properties = properties;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AppException.class)
     public StartVerificationResponseDto startAttempt(String username, MultipartFile cardFile) {
         User user = userRepository.findByUsernameWithLock(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -201,7 +201,7 @@ public class IdentityVerificationService {
         );
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AppException.class)
     public LivenessStepResultDto verifyLivenessStep(String username, String attemptId, List<MultipartFile> frames) {
         IdentityVerificationAttempt attempt = attemptRepository.findByAttemptId(attemptId)
                 .orElseThrow(() -> new AppException(ErrorCode.IDENTITY_ATTEMPT_NOT_FOUND));
@@ -318,7 +318,7 @@ public class IdentityVerificationService {
         }
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AppException.class)
     public FaceVerificationResultDto verifyFaceAndComplete(
             String username, String attemptId, MultipartFile cardFile, MultipartFile selfieFile) {
 

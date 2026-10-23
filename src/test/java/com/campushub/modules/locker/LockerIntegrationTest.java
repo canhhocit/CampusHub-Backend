@@ -80,7 +80,9 @@ public class LockerIntegrationTest {
 
     @Test
     public void testAnonymousCannotAccessLockers() throws Exception {
-        mockMvc.perform(get("/api/v1/lockers"))
+        mockMvc.perform(post("/api/v1/lockers").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
                 .andExpect(status().isUnauthorized());
     }
 
