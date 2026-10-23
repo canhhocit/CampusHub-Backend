@@ -1,156 +1,211 @@
 ---
 name: springboot-tdd
-description: Test-driven development for Spring Boot using JUnit 5, Mockito, MockMvc, and integration tests. Use when adding features, fixing bugs, testing authorization, or refactoring backend services.
+description: Test-driven development, unit testing, integration testing, authorization verification, and regression test practices for CampusHub-Backend. Use when adding features, fixing bugs, writing tests, or verifying database and security boundaries.
 metadata:
   origin: ECC
 ---
 
-# Spring Boot TDD Workflow
+# Spring Boot TDD & Testing Workflow (CampusHub Quality Assurance)
 
-TDD guidance for Spring Boot services with comprehensive coverage across unit, integration, and authorization testing.
+Hướng dẫn kiểm thử phần mềm đa tầng cho repository CampusHub-Backend (JUnit 5, Mockito, MockMvc, SpringBootTest, AssertJ).
 
-## When to Use
+> Xem tài liệu chi tiết tại: [references/testing-patterns.md](references/testing-patterns.md)
 
-- New features, services, or endpoints
-- Bug fixes, regression reproductions, or refactors
-- Adding data access logic, transaction boundaries, or security/authorization rules
+---
 
-## Workflow
+## 1. Phân Định Các Tầng Kiểm Thử
 
-1) Write tests first (they should fail initially)
-2) Implement minimal code to pass
-3) Refactor with tests green
-4) Verify regression and edge cases
+CampusHub phân tách rõ mục đích của từng tầng test để tối ưu tốc độ và độ tin cậy:
 
-## Unit Tests (JUnit 5 + Mockito)
+| Tầng Kiểm Thử | Annotation Chính | Mục Đích & Phạm Vi | Tốc Độ |
+| :--- | :--- | :--- | :--- |
+| **Unit Test** | `@ExtendWith(MockitoExtension.class)` | Kiểm tra logic tính toán, máy trạng thái, kiểm tra điều kiện nghiệp vụ trong Service. Mock toàn bộ repository và network client. | Siêu nhanh (< 100ms) |
+| **WebMvc Slice** | `@WebMvcTest(Controller.class)` hoặc MockMvc | Kiểm tra định dạng JSON, Bean Validation `@Valid`, mã HTTP status, và bảo vệ `@PreAuthorize`. | Nhanh (~ 1s) |
+| **Integration Test** | `@SpringBootTest` + `@AutoConfigureMockMvc` | Kiểm tra luồng liên module hoàn chỉnh (Order -> Locker -> Payment) với Spring Context và database test. | Trung bình (~ 3-5s) |
+| **Persistence Test**| `@DataJpaTest` | Kiểm tra truy vấn Spring Data JPA, derived queries, và `@Query` phức tạp. | Nhanh (~ 1-2s) |
+
+---
+
+## 2. Unit Tests (JUnit 5 + Mockito)
+
+Áp dụng cấu trúc chuẩn **Arrange - Act - Assert**, mock toàn bộ dependencies, kiểm tra cả luồng thành công và ngoại lệ:
 
 ```java
 @ExtendWith(MockitoExtension.class)
-class MarketServiceTest {
-  @Mock MarketRepository repo;
-  @InjectMocks MarketService service;
+class OrderServiceTest {
 
-  @Test
-  void createsMarket() {
-    CreateMarketRequest req = new CreateMarketRequest("name", "desc", Instant.now(), List.of("cat"));
-    when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    @Mock private OrderRepository orderRepository;
+    @Mock private ProductRepository productRepository;
+    @Mock private UserRepository userRepository;
+    @InjectMocks private OrderService orderService;
 
-    Market result = service.create(req);
+    @Test
+    void createOrder_whenProductNotActive_throwsAppException() {
+        // Arrange
+        User buyer = new User();
+        buyer.setUsername("buyer");
 
-    assertThat(result.name()).isEqualTo("name");
-    verify(repo).save(any());
-  }
+        Product product = new Product();
+        product.setStatus(ProductStatus.SOLD);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        // Act & Assert
+        assertThatThrownBy(() -> orderService.createOrder(1L, buyer.getUsername()))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PRODUCT_NOT_AVAILABLE);
+
+        verify(orderRepository, never()).save(any());
+    }
 }
 ```
 
-Patterns:
-- Arrange-Act-Assert
-- Avoid partial mocks; prefer explicit stubbing
-- Use `@ParameterizedTest` with `@ValueSource`, `@CsvSource`, or `@MethodSource` for input variations
+---
 
-## Web Layer & Authorization Tests (MockMvc)
+## 3. Web Layer & Authorization Testing (MockMvc)
+
+### Kiểm thử quyền hạn & chống IDOR bắt buộc:
+Mọi endpoint chỉnh sửa tài nguyên phải kiểm tra cả 3 trường hợp:
+1. Không đăng nhập (Anonymous) -> `401 Unauthorized`
+2. Đăng nhập nhưng không sở hữu tài nguyên (Non-owner / Attacker) -> `403 Forbidden` hoặc `400 Bad Request` với mã `UNAUTHORIZED_ACTION`
+3. Chủ sở hữu hợp pháp -> `200 OK`
+
+> **Lưu ý tương thích Spring Boot 3.4.1**: Mã nguồn kiểm thử hiện tại (`IdentityIntegrationTest.java`) sử dụng `@MockBean` (`org.springframework.boot.test.mock.mockito.MockBean`). Spring Boot 3.4 giới thiệu thêm `@MockitoBean` (`org.springframework.test.context.bean.override.mockito.MockitoBean`). Cả hai đều hợp lệ trên Spring Boot 3.4.1; giữ nguyên quy ước hiện có của codebase và không tự ý thay đổi hàng loạt import kiểm thử đang chạy ổn định.
 
 ```java
-@WebMvcTest(MarketController.class)
-class MarketControllerTest {
-  @Autowired MockMvc mockMvc;
-  @MockBean MarketService marketService;
+@WebMvcTest(MarketplaceController.class)
+class MarketplaceControllerSecurityTest {
 
-  @Test
-  @WithMockUser(roles = "USER")
-  void returnsMarketsWhenAuthorized() throws Exception {
-    when(marketService.list(any())).thenReturn(Page.empty());
+    @Autowired private MockMvc mockMvc;
+    @MockBean private MarketplaceService marketplaceService;
 
-    mockMvc.perform(get("/api/markets"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content").isArray());
-  }
+    @Test
+    void createProduct_whenAnonymous_returnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Demo\",\"price\":10000}"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error").value("Unauthorized"));
+    }
 
-  @Test
-  void returnsUnauthorizedWhenAnonymous() throws Exception {
-    mockMvc.perform(post("/api/markets")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content("{}"))
-        .andExpect(status().isUnauthorized());
-  }
+    @Test
+    @WithMockUser(username = "attacker_user", roles = "USER")
+    void updateProduct_whenNotOwner_returnsForbiddenOrUnauthorizedAction() throws Exception {
+        when(marketplaceService.updateProduct(eq(1L), any(), eq("attacker_user")))
+            .thenThrow(new AppException(ErrorCode.UNAUTHORIZED_ACTION));
+
+        mockMvc.perform(put("/api/v1/products/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Hacked Title\",\"price\":50000,\"version\":1}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("UNAUTHORIZED_ACTION"));
+    }
 }
 ```
 
-## Integration Tests (SpringBootTest)
+---
+
+## 4. Integration & Business Regression Testing (`@SpringBootTest`)
+
+Sử dụng profile `test` để chạy kiểm thử tích hợp luồng nghiệp vụ:
 
 ```java
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-class MarketIntegrationTest {
-  @Autowired MockMvc mockMvc;
-  @Autowired MarketRepository marketRepository;
+class BusinessIntegrationTest {
 
-  @Test
-  @WithMockUser(username = "seller@test.com", roles = "USER")
-  void createsMarketSuccessfully() throws Exception {
-    mockMvc.perform(post("/api/markets")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content("""
-          {"name":"Test","description":"Desc","endDate":"2030-01-01T00:00:00Z","categories":["general"]}
-        """))
-      .andExpect(status().isCreated());
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ProductRepository productRepository;
+    @Autowired private UserRepository userRepository;
 
-    assertThat(marketRepository.findAll()).hasSize(1);
-  }
+    @Test
+    @WithMockUser(username = "seller@test.com", roles = "USER")
+    void fullProductCreationFlow_persistsToDatabase() throws Exception {
+        mockMvc.perform(post("/api/v1/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                  {
+                    "title": "Sách Giáo Trình Giải Tích",
+                    "description": "Sách còn mới 95%",
+                    "price": 50000,
+                    "categoryId": 1
+                  }
+                """))
+            .andExpect(status().isCreated());
+
+        Optional<Product> saved = productRepository.findByTitle("Sách Giáo Trình Giải Tích");
+        assertThat(saved).isPresent();
+        assertThat(saved.get().getPrice()).isEqualByComparingTo("50000");
+    }
 }
 ```
 
-## Persistence Tests (DataJpaTest)
+---
+
+## 5. THỰC TẾ KIỂM THỬ CƠ SỞ DỮ LIỆU: H2 VS POSTGRESQL & FLYWAY
+
+### CẢNH BÁO NGUY HIỂM VỀ GIẢ ĐỊNH DATABASE
+Trong `application-test.properties`, dự án sử dụng:
+- Database: H2 in-memory (`jdbc:h2:mem:campushub-test`)
+- Hibernate: `ddl-auto=create-drop`
+- Flyway: `spring.flyway.enabled=false`
+
+> **Test chạy thành công trên H2 KHÔNG CHỨNG MINH Flyway migrations và PostgreSQL hoạt động hoàn toàn đúng.**
+
+- H2 không chạy các file migration `V1`..`V16` (vì Flyway bị tắt trong test profile để tăng tốc độ kiểm thử).
+- H2 không phát hiện được lỗi cú pháp đặc thù của PostgreSQL (như kiểu dữ liệu JSONB, hàm thời gian PostgreSQL, index đặc thù).
+- **Quy tắc**:
+  - H2 dùng để verify nhanh business logic, quan hệ JPA và validation trong lúc dev/CI.
+  - Khi có migration mới (`V...__...sql`), bắt buộc phải chạy thử Flyway trên PostgreSQL thật trước khi merge mã nguồn.
+
+---
+
+## 6. Kiểm Thử Đồng Thời & Khóa Lạc Quan (Optimistic Locking)
+
+Xác minh hệ thống không bị lỗi Lost Update khi 2 giao dịch cập nhật cùng một bản ghi:
 
 ```java
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
-class MarketRepositoryTest {
-  @Autowired MarketRepository repo;
-  @Autowired TestEntityManager entityManager;
+@Test
+void updateProduct_whenVersionMismatch_throwsConcurrentUpdate() {
+    Product product = new Product();
+    product.setVersion(2L); // Version hiện tại trong DB là 2
 
-  @Test
-  void savesAndFindsByStatus() {
-    MarketEntity entity = new MarketEntity();
-    entity.setName("Test");
-    entity.setStatus(MarketStatus.ACTIVE);
-    entityManager.persistAndFlush(entity);
+    ProductUpdateRequest req = new ProductUpdateRequest();
+    req.setVersion(1L); // Client gửi lên version cũ là 1
 
-    Optional<MarketEntity> found = repo.findByName("Test");
-    assertThat(found).isPresent();
-    assertThat(found.get().getStatus()).isEqualTo(MarketStatus.ACTIVE);
-  }
+    assertThatThrownBy(() -> marketplaceService.validateVersion(product, req.getVersion()))
+        .isInstanceOf(AppException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONCURRENT_UPDATE);
 }
 ```
 
-## Transaction Boundaries in Tests
+---
 
-- By default, `@Transactional` on test classes rolls back mutations at the end of each test method, keeping the database clean.
-- When testing async callbacks, event listeners, or committed states, configure `@Commit` or use an explicit transaction template to verify boundary isolation.
+## 7. Các Nguyên Tắc Tránh Viết Test Vô Nghĩa (Anti-Patterns)
 
-## Assertions
+- **Không viết test getter/setter đơn thuần**: Chỉ test hành vi nghiệp vụ và phương thức có logic xử lý.
+- **Không mock rồi assert lại chính cái vừa mock**: Phải assert kết quả đầu ra thực tế hoặc xác nhận `verify(...)` hành động có tác dụng phụ.
+- **Không bỏ qua nhánh lỗi**: Mỗi hàm nghiệp vụ phải có ít nhất 1 test cho Happy Path và các test cho nhánh điều kiện biên/lỗi.
+- **Viết Regression Test cho mọi bug**: Khi sửa 1 bug, viết test tái hiện lỗi trước để bảo vệ chống tái phát trong tương lai.
 
-- Prefer AssertJ (`assertThat`) for readable, fluent assertions
-- For JSON responses: `jsonPath("$.status").value("SUCCESS")`
-- For exception handling: `assertThatThrownBy(() -> service.process(null)).isInstanceOf(IllegalArgumentException.class)`
+---
 
-## Test Data Builders
+## 8. Lệnh Thực Thi Kiểm Thử
 
-```java
-class MarketBuilder {
-  private String name = "Test";
-  MarketBuilder withName(String name) { this.name = name; return this; }
-  Market build() { return new Market(null, name, MarketStatus.ACTIVE); }
-}
-```
-
-## Execution Commands
-
-- Run all unit and integration tests: `mvn test`
-- Run a specific test class: `mvn test -Dtest=MarketServiceTest`
-- Run a specific test method: `mvn test -Dtest=MarketServiceTest#createsMarket`
-- Run full build and verify: `mvn verify`
-
-**Remember**: Keep tests fast, isolated, and deterministic. Test real behavior, authorization boundaries, and failure modes, not just the happy path.
+- Chạy toàn bộ test suite:
+  ```powershell
+  mvn test
+  ```
+- Chạy một class test cụ thể:
+  ```powershell
+  mvn test -Dtest=OrderServiceTest
+  ```
+- Chạy một method test đơn lẻ:
+  ```powershell
+  mvn test -Dtest=OrderServiceTest#createOrder_whenProductNotActive_throwsAppException
+  ```
+- Chạy kiểm tra toàn diện cả build và package:
+  ```powershell
+  mvn verify
+  ```

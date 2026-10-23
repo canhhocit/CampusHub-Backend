@@ -1,315 +1,173 @@
 ---
 name: springboot-patterns
-description: Spring Boot architecture patterns, REST API design, layered services, data access, caching, async processing, and logging. Use for Java Spring Boot backend work. Use when building or reviewing a Spring Boot backend — REST layer, services, data access, caching, or async work.
+description: Spring Boot modular monolith architecture, layered service design, safe transaction boundaries, and DTO patterns for CampusHub-Backend. Use when building or reviewing controllers, services, repositories, DTOs, transactions, caching, or external integrations.
 metadata:
   origin: ECC
 ---
 
-# Spring Boot Development Patterns
+# Spring Boot Development Patterns (CampusHub Architecture)
 
-Spring Boot architecture and API patterns for scalable, production-grade services.
+Hướng dẫn kiến trúc và mẫu thiết kế mã nguồn chuẩn cho repository CampusHub-Backend (Spring Boot 3.4.1, Java 17, PostgreSQL).
 
-## When to Activate
+> Xem tài liệu chi tiết tại: [references/modular-monolith-guidelines.md](references/modular-monolith-guidelines.md)
 
-- Building REST APIs with Spring MVC or WebFlux
-- Structuring controller → service → repository layers
-- Configuring Spring Data JPA, caching, or async processing
-- Adding validation, exception handling, or pagination
-- Setting up profiles for dev/staging/production environments
-- Implementing event-driven patterns with Spring Events or message passing
+---
 
-## REST API Structure
+## 1. Kiến Trúc Modular Monolith & Phân Tầng Trách Nhiệm
+
+Mã nguồn được tổ chức theo module nghiệp vụ (`com.campushub.modules.<feature>.*`), dùng chung các tiện ích tại `com.campushub.common.*`.
+
+### Phân tách trách nhiệm 3 tầng (Layered Separation):
+- **Controller Layer**: Chỉ tiếp nhận HTTP, trích xuất token/user, validate request DTO qua `@Valid`, ủy quyền xử lý cho Service và trả về `ResponseEntity<T>`. Tuyệt đối không chứa logic tính toán nghiệp vụ hay truy vấn SQL.
+- **Service Layer**: Nơi duy nhất thực thi logic nghiệp vụ, xác thực quyền sở hữu (ownership), kiểm tra điều kiện trạng thái và quản lý ranh giới giao dịch (`@Transactional`).
+- **Repository Layer**: Giao tiếp PostgreSQL qua Spring Data JPA, derived queries và `@Query` có parameter binding (`:param`).
 
 ```java
+// Ví dụ Controller chuẩn: Gọn gàng, chỉ ủy quyền và validate DTO
 @RestController
-@RequestMapping("/api/markets")
-@Validated
-class MarketController {
-  private final MarketService marketService;
+@RequestMapping("/api/v1/products")
+@Tag(name = "Marketplace", description = "Quản lý sản phẩm và danh mục")
+public class MarketplaceController {
 
-  MarketController(MarketService marketService) {
-    this.marketService = marketService;
-  }
+    private final MarketplaceService marketplaceService;
 
-  @GetMapping
-  ResponseEntity<Page<MarketResponse>> list(
-      @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "20") int size) {
-    Page<Market> markets = marketService.list(PageRequest.of(page, size));
-    return ResponseEntity.ok(markets.map(MarketResponse::from));
-  }
-
-  @PostMapping
-  ResponseEntity<MarketResponse> create(@Valid @RequestBody CreateMarketRequest request) {
-    Market market = marketService.create(request);
-    return ResponseEntity.status(HttpStatus.CREATED).body(MarketResponse.from(market));
-  }
-}
-```
-
-## Repository Pattern (Spring Data JPA)
-
-```java
-public interface MarketRepository extends JpaRepository<MarketEntity, Long> {
-  @Query("select m from MarketEntity m where m.status = :status order by m.volume desc")
-  List<MarketEntity> findActive(@Param("status") MarketStatus status, Pageable pageable);
-}
-```
-
-## Service Layer with Transactions
-
-```java
-@Service
-public class MarketService {
-  private final MarketRepository repo;
-
-  public MarketService(MarketRepository repo) {
-    this.repo = repo;
-  }
-
-  @Transactional
-  public Market create(CreateMarketRequest request) {
-    MarketEntity entity = MarketEntity.from(request);
-    MarketEntity saved = repo.save(entity);
-    return Market.from(saved);
-  }
-}
-```
-
-## DTOs and Validation
-
-```java
-public record CreateMarketRequest(
-    @NotBlank @Size(max = 200) String name,
-    @NotBlank @Size(max = 2000) String description,
-    @NotNull @FutureOrPresent Instant endDate,
-    @NotEmpty List<@NotBlank String> categories) {}
-
-public record MarketResponse(Long id, String name, MarketStatus status) {
-  static MarketResponse from(Market market) {
-    return new MarketResponse(market.id(), market.name(), market.status());
-  }
-}
-```
-
-## Exception Handling
-
-```java
-@ControllerAdvice
-class GlobalExceptionHandler {
-  @ExceptionHandler(MethodArgumentNotValidException.class)
-  ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
-    String message = ex.getBindingResult().getFieldErrors().stream()
-        .map(e -> e.getField() + ": " + e.getDefaultMessage())
-        .collect(Collectors.joining(", "));
-    return ResponseEntity.badRequest().body(ApiError.validation(message));
-  }
-
-  @ExceptionHandler(AccessDeniedException.class)
-  ResponseEntity<ApiError> handleAccessDenied() {
-    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiError.of("Forbidden"));
-  }
-
-  @ExceptionHandler(Exception.class)
-  ResponseEntity<ApiError> handleGeneric(Exception ex) {
-    // Log unexpected errors with stack traces
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(ApiError.of("Internal server error"));
-  }
-}
-```
-
-## Caching
-
-Requires `@EnableCaching` on a configuration class.
-
-```java
-@Service
-public class MarketCacheService {
-  private final MarketRepository repo;
-
-  public MarketCacheService(MarketRepository repo) {
-    this.repo = repo;
-  }
-
-  @Cacheable(value = "market", key = "#id")
-  public Market getById(Long id) {
-    return repo.findById(id)
-        .map(Market::from)
-        .orElseThrow(() -> new EntityNotFoundException("Market not found"));
-  }
-
-  @CacheEvict(value = "market", key = "#id")
-  public void evict(Long id) {}
-}
-```
-
-## Async Processing
-
-Requires `@EnableAsync` on a configuration class.
-
-```java
-@Service
-public class NotificationService {
-  @Async
-  public CompletableFuture<Void> sendAsync(Notification notification) {
-    // send email/SMS
-    return CompletableFuture.completedFuture(null);
-  }
-}
-```
-
-## Logging (SLF4J)
-
-```java
-@Service
-public class ReportService {
-  private static final Logger log = LoggerFactory.getLogger(ReportService.class);
-
-  public Report generate(Long marketId) {
-    log.info("generate_report marketId={}", marketId);
-    try {
-      // logic
-    } catch (Exception ex) {
-      log.error("generate_report_failed marketId={}", marketId, ex);
-      throw ex;
+    public MarketplaceController(MarketplaceService marketplaceService) {
+        this.marketplaceService = marketplaceService;
     }
-    return new Report();
-  }
-}
-```
 
-## Middleware / Filters
-
-```java
-@Component
-public class RequestLoggingFilter extends OncePerRequestFilter {
-  private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
-
-  @Override
-  protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-      FilterChain filterChain) throws ServletException, IOException {
-    long start = System.currentTimeMillis();
-    try {
-      filterChain.doFilter(request, response);
-    } finally {
-      long duration = System.currentTimeMillis() - start;
-      log.info("req method={} uri={} status={} durationMs={}",
-          request.getMethod(), request.getRequestURI(), response.getStatus(), duration);
+    @PostMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ProductResponse> createProduct(
+            @Valid @RequestBody ProductCreateRequest request,
+            Authentication authentication) {
+        ProductResponse response = marketplaceService.createProduct(request, authentication.getName());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
-  }
 }
 ```
 
-## Pagination and Sorting
+---
+
+## 2. Thiết Kế DTO, Validation & Mapping
+
+- Sử dụng Java 17 Records hoặc DTO chuyên biệt cho từng luồng dữ liệu (Request DTO vs Response DTO).
+- Không để lọt Entity JPA trực tiếp ra ngoài API response (tránh lộ cấu trúc bảng hoặc vòng lặp quan hệ lười Lazy Loading).
+- Áp dụng Bean Validation đầy đủ trên Request DTO:
 
 ```java
-PageRequest page = PageRequest.of(pageNumber, pageSize, Sort.by("createdAt").descending());
-Page<Market> results = marketService.list(page);
+public record ProductCreateRequest(
+    @NotBlank(message = "Tiêu đề không được để trống")
+    @Size(max = 200, message = "Tiêu đề tối đa 200 ký tự")
+    String title,
+
+    @NotBlank(message = "Mô tả không được để trống")
+    @Size(max = 2000, message = "Mô tả tối đa 2000 ký tự")
+    String description,
+
+    @NotNull(message = "Giá không được để trống")
+    @Positive(message = "Giá phải lớn hơn 0")
+    BigDecimal price,
+
+    @NotNull(message = "Danh mục không được để trống")
+    Long categoryId,
+
+    List<@NotBlank String> detailImageUrls
+) {}
 ```
 
-## Error-Resilient External Calls
+---
+
+## 3. Ranh Giới Giao Dịch & Quy Tắc Gọi Dịch Vụ HTTP Ngoại Vi
+
+### 3.1. Rủi ro nghẽn Connection Pool & Kiến trúc mục tiêu
+CampusHub tích hợp các dịch vụ HTTP ngoại vi: **Cloudinary** (upload media), **PayOS** (cổng thanh toán), và **OCR Service** (nhận dạng CCCD/khuôn mặt).
+- **Nguyên lý kiến trúc**: Tránh giữ Database Transaction (`@Transactional`) trong lúc đang chờ phản hồi từ các cuộc gọi HTTP mạng bên ngoài. Network I/O có thể mất từ 1-5 giây; việc giữ kết nối cơ sở dữ liệu qua mạng sẽ làm chiếm dụng kết nối của HikariCP connection pool, nhanh chóng gây cạn kiệt pool và làm nghẽn toàn bộ ứng dụng.
+- **Hiện trạng mã nguồn CampusHub**:
+  - Trong các module hiện tại (`PaymentService.java`, `IdentityVerificationService.java`), một số phương thức vẫn đang đặt `@Transactional` bao quanh cả bước gọi bên thứ ba (OCR, PayOS).
+  - Khi viết tính năng mới hoặc tối ưu hóa, hãy tách bạch quy trình theo mô hình 3 bước:
+    1. **Bước 1 (Kiểm tra/Chuẩn bị)**: Đọc dữ liệu hoặc cập nhật trạng thái chuẩn bị (Transaction ngắn).
+    2. **Bước 2 (Gọi HTTP ngoại vi)**: Gọi PayOS / Cloudinary / OCR client **bên ngoài Transaction**.
+    3. **Bước 3 (Ghi nhận kết quả nguyên tử)**: Mở transaction ngắn gọn để lưu kết quả và cập nhật trạng thái Entity vào PostgreSQL.
+
+### 3.2. Xử lý kịch bản thất bại Dual-Write (API ngoài thành công nhưng DB thất bại)
+Khi tương tác với hệ thống phân tán bên thứ ba mà không có 2-Phase Commit (2PC):
+1. **Trường hợp Cloudinary**:
+   - Nếu upload ảnh/video lên Cloudinary thành công nhưng lưu URL vào DB bị lỗi -> File trở thành file mồ côi (orphaned asset) trên Cloudinary.
+   - *Cách xử lý*: Chấp nhận rủi ro này (dung lượng Cloudinary có thể dọn sau), bọc upload trong `try-catch` (`log.warn(...)` như trong `IdentityVerificationService`) để lỗi tải ảnh phụ không làm đổ vỡ toàn bộ giao dịch chính.
+2. **Trường hợp PayOS (Tạo link thanh toán)**:
+   - Nếu PayOS đã tạo link thanh toán và mã `orderCode`, nhưng lưu DB thất bại -> Người dùng có thể thanh toán một `orderCode` mà DB chưa lưu.
+   - *Cách xử lý*: Lưu hoặc sinh `payosOrderCode` trước khi gọi PayOS, hoặc sử dụng cơ chế tạo mã xác định theo `order.getId()`.
+3. **Trường hợp OCR / Liveness**:
+   - Nếu gọi OCR thành công nhưng lưu DB thất bại -> Người dùng nhận lỗi và thực hiện lại lượt thử (attempt) mới.
+   - Bắt các ngoại lệ mạng cụ thể (`OcrConnectionException`, `OcrTimeoutException`) và dịch thành `ErrorCode.IDENTITY_SERVICE_UNAVAILABLE`, không để văng HTTP 500 không kiểm soát.
+
+---
+
+## 4. Quy Tắc Retry & Idempotency (Xử Lý Tác Dụng Phụ An Toàn)
+
+### 4.1. CẤM retry cho các thao tác có side effect
+- **TUYỆT ĐỐI KHÔNG tự động retry các thao tác có tác dụng phụ (side effects)**:
+  - Thao tác POST tạo sản phẩm, tạo đơn hàng -> Nguy cơ tạo trùng đơn hàng.
+  - Thao tác tạo thanh toán hoặc trừ tiền PayOS -> Nguy cơ tạo nhiều link thanh toán hoặc trừ tiền nhiều lần.
+  - Thao tác upload Cloudinary -> Nguy cơ lãng phí dung lượng.
+  - Lệnh gửi tín hiệu mở ngăn tủ thông minh -> Gửi nhiều xung lệnh làm kẹt cơ chế phần cứng.
+
+### 4.2. Mẫu thiết kế Idempotency (Hiện thực thực tế trong `PaymentService`)
+Khi nhận Webhook từ bên ngoài (ví dụ PayOS gửi webhook xác nhận thanh toán nhiều lần khi mạng chập chờn):
+- **Luôn kiểm tra trạng thái hiện tại trước khi ghi nhận**:
+  ```java
+  // Minh họa từ PaymentService.java:
+  Optional<Order> orderOpt = orderRepository.findByPayosOrderCode(orderCode);
+  if (orderOpt.isEmpty()) {
+      log.warn("PayOS webhook orderCode không tồn tại: {}", orderCode);
+      return Map.of("code", "00", "desc", "Đã nhận nhưng không tìm thấy đơn"); // Trả 00 để PayOS không retry dồn dập
+  }
+
+  Order order = orderOpt.get();
+  if (order.getPaymentStatus() != PaymentStatus.PAID) { // Kiểm tra tính bất biến idempotent
+      order.setPaymentStatus(PaymentStatus.PAID);
+      order.setPaymentPaidAt(LocalDateTime.now());
+      orderRepository.save(order);
+  }
+  return Map.of("code", "00", "desc", "success");
+  ```
+- **Chỉ áp dụng retry khi**:
+  - Thao tác là **Idempotent** (đọc GET, hoặc truy vấn kiểm tra trạng thái thanh toán `getPaymentStatus`).
+  - Có khoảng trễ lũy thừa (Exponential Backoff) và giới hạn số lần thử (tối đa 2-3 lần).
+
+---
+
+## 5. Caching & Xử Lý Bất Đồng Bộ Đúng Chuẩn
+
+- **Caching**:
+  - Chỉ cache dữ liệu đọc thường xuyên nhưng ít thay đổi (ví dụ: Danh mục sản phẩm, cấu hình media/phí hệ thống).
+  - Sử dụng **Caffeine Cache** đã có trong `CacheConfig.java` (`@Cacheable(value = "...", key = "...")`).
+  - **Không tự ý thêm Redis** vào ứng dụng khi không có chỉ thị.
+  - Nhớ cấu hình `@CacheEvict` khi dữ liệu danh mục hoặc cấu hình bị cập nhật.
+- **Async (`@Async`)**:
+  - Dùng cho các tác vụ phụ trợ không bắt buộc hoàn thành ngay lập tức (gửi email thông báo).
+  - Phải cấu hình thread pool có giới hạn (tránh tạo thread vô hạn làm treo JVM).
+
+---
+
+## 6. Xử Lý Ngoại Lệ Nhất Quán (Exception Handling)
+
+- Mọi lỗi nghiệp vụ phải ném `AppException(ErrorCode.<MA_LOI>)`.
+- Không bắt `Exception` rồi nuốt lỗi (silent catch).
+- `GlobalExceptionHandler` bắt tập trung toàn bộ ngoại lệ và trả về mã lỗi chuẩn hóa, không trả về raw stack trace ra ngoài response.
 
 ```java
-public <T> T withRetry(Supplier<T> supplier, int maxRetries) {
-  int attempts = 0;
-  while (true) {
-    try {
-      return supplier.get();
-    } catch (Exception ex) {
-      attempts++;
-      if (attempts >= maxRetries) {
-        throw ex;
-      }
-      try {
-        Thread.sleep((long) Math.pow(2, attempts) * 100L);
-      } catch (InterruptedException ie) {
-        Thread.currentThread().interrupt();
-        throw ex;
-      }
-    }
-  }
+// Ném ngoại lệ nghiệp vụ chuẩn
+if (product.getStatus() != ProductStatus.ACTIVE) {
+    throw new AppException(ErrorCode.PRODUCT_NOT_AVAILABLE);
 }
 ```
 
-## Rate Limiting (Filter + Bucket4j)
+---
 
-**Security Note**: The `X-Forwarded-For` header is untrusted by default because clients can spoof it.
-Only use forwarded headers when:
-1. Your app is behind a trusted reverse proxy (nginx, AWS ALB, etc.)
-2. You have registered `ForwardedHeaderFilter` as a bean
-3. You have configured `server.forward-headers-strategy=NATIVE` or `FRAMEWORK` in application properties
-4. Your proxy is configured to overwrite (not append to) the `X-Forwarded-For` header
+## 7. Nguyên Tắc Tránh Over-Engineering & Mặc Định Sản Xuất
 
-When `ForwardedHeaderFilter` is properly configured, `request.getRemoteAddr()` will automatically
-return the correct client IP from the forwarded headers. Without this configuration, use
-`request.getRemoteAddr()` directly—it returns the immediate connection IP, which is the only
-trustworthy value.
-
-```java
-@Component
-public class RateLimitFilter extends OncePerRequestFilter {
-  private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
-
-  /*
-   * SECURITY: This filter uses request.getRemoteAddr() to identify clients for rate limiting.
-   *
-   * If your application is behind a reverse proxy (nginx, AWS ALB, etc.), you MUST configure
-   * Spring to handle forwarded headers properly for accurate client IP detection:
-   *
-   * 1. Set server.forward-headers-strategy=NATIVE (for cloud platforms) or FRAMEWORK in
-   *    application.properties/yaml
-   * 2. If using FRAMEWORK strategy, register ForwardedHeaderFilter:
-   *
-   *    @Bean
-   *    ForwardedHeaderFilter forwardedHeaderFilter() {
-   *        return new ForwardedHeaderFilter();
-   *    }
-   *
-   * 3. Ensure your proxy overwrites (not appends) the X-Forwarded-For header to prevent spoofing
-   * 4. Configure server.tomcat.remoteip.trusted-proxies or equivalent for your container
-   *
-   * Without this configuration, request.getRemoteAddr() returns the proxy IP, not the client IP.
-   * Do NOT read X-Forwarded-For directly—it is trivially spoofable without trusted proxy handling.
-   */
-  @Override
-  protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-      FilterChain filterChain) throws ServletException, IOException {
-    // Use getRemoteAddr() which returns the correct client IP when ForwardedHeaderFilter
-    // is configured, or the direct connection IP otherwise. Never trust X-Forwarded-For
-    // headers directly without proper proxy configuration.
-    String clientIp = request.getRemoteAddr();
-
-    Bucket bucket = buckets.computeIfAbsent(clientIp,
-        k -> Bucket.builder()
-            .addLimit(Bandwidth.classic(100, Refill.greedy(100, Duration.ofMinutes(1))))
-            .build());
-
-    if (bucket.tryConsume(1)) {
-      filterChain.doFilter(request, response);
-    } else {
-      response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-    }
-  }
-}
-```
-
-## Background Jobs
-
-Use Spring’s `@Scheduled` or Spring Events. Keep handlers idempotent and observable.
-
-## Observability
-
-- Structured logging via SLF4J / Logback
-- Metrics: Micrometer + Actuator
-- Tracing: Micrometer Tracing with trace/span correlation
-
-## Production Defaults
-
-- Prefer constructor injection, avoid field injection
-- Enable `spring.mvc.problemdetails.enabled=true` for RFC 7807 errors (Spring Boot 3+)
-- Configure HikariCP pool sizes for workload, set timeouts
-- Use `@Transactional(readOnly = true)` for queries
-- Enforce null-safety via `@NonNull` and `Optional` where appropriate
-
-**Remember**: Keep controllers thin, services focused, repositories simple, and errors handled centrally. Optimize for maintainability and testability.
+- **Ưu tiên giải pháp đơn giản**: Không tự ý tạo thêm abstract class, factory, generic wrapper hay module mới nếu nghiệp vụ thực tế chưa yêu cầu.
+- **Constructor Injection**: Sử dụng constructor injection, tránh `@Autowired` trên field.
+- **Optimistic Locking**: Sử dụng trường `@Version` trên Entity để phát hiện và ngăn chặn ghi đè đồng thời (`OptimisticLockException` -> HTTP 409 Conflict).
+- **Kiến trúc bền vững**: Giữ vững mô hình Modular Monolith, không tự phân tách thành microservices hay đưa vào các message queue (Kafka, RabbitMQ) không cần thiết.
