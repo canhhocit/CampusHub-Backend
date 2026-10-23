@@ -38,9 +38,10 @@ import java.util.Map;
 import java.util.UUID;
 import com.campushub.modules.identity.enums.VerificationFailureCode;
 
+import com.campushub.modules.identity.service.IdentityFailureRecorder;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -61,6 +62,9 @@ public class IdentityIntegrationTest {
 
     @Autowired
     private IdentityVerificationAttemptRepository attemptRepository;
+
+    @Autowired
+    private IdentityFailureRecorder failureRecorder;
 
     @Autowired
     private JwtProvider jwtTokenProvider;
@@ -407,14 +411,91 @@ public class IdentityIntegrationTest {
         attempt.setLivenessSessionId("sess-test");
         attempt.setStartedAt(LocalDateTime.now());
         attempt.setExpiresAt(LocalDateTime.now().plusMinutes(15));
+        attempt.setStepCount(0);
         attemptRepository.save(attempt);
 
-        // Other user attempts to get or submit
+        // 1. Non-owner attempts to GET attempt
         mockMvc.perform(
                 get("/api/v1/identity/attempts/att-ownership-test")
                         .header("Authorization", "Bearer " + otherToken)
         )
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.error").value("UNAUTHORIZED_ACTION"));
+
+        // 2. Non-owner attempts to POST liveness-step
+        MockMultipartFile frame = new MockMultipartFile("frames", "f1.jpg", "image/jpeg", validJpegBytes);
+        mockMvc.perform(
+                multipart("/api/v1/identity/attempts/att-ownership-test/liveness-step")
+                        .file(frame)
+                        .header("Authorization", "Bearer " + otherToken)
+        )
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error").value("UNAUTHORIZED_ACTION"));
+
+        // 3. Non-owner attempts to POST verify-face
+        MockMultipartFile cardFile = new MockMultipartFile("card_file", "card.jpg", "image/jpeg", validJpegBytes);
+        MockMultipartFile selfieFile = new MockMultipartFile("selfie_file", "selfie.jpg", "image/jpeg", validJpegBytes);
+        mockMvc.perform(
+                multipart("/api/v1/identity/attempts/att-ownership-test/verify-face")
+                        .file(cardFile)
+                        .file(selfieFile)
+                        .header("Authorization", "Bearer " + otherToken)
+        )
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error").value("UNAUTHORIZED_ACTION"));
+
+        // Verify OCR service was NEVER called by unauthorized requests
+        verifyNoInteractions(ocrClient);
+
+        // Verify attempt in DB remains completely unchanged
+        IdentityVerificationAttempt unchanged = attemptRepository.findByAttemptId("att-ownership-test").orElseThrow();
+        assertEquals(VerificationAttemptStatus.LIVENESS_IN_PROGRESS, unchanged.getStatus());
+        assertEquals(0, unchanged.getStepCount());
+        assertNull(unchanged.getFailureCode());
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @DisplayName("Bảo đảm attempt hết hạn được đánh dấu EXPIRED và từ chối xử lý")
+    void testExpiredAttemptHandledCorrectly() throws Exception {
+        attemptRepository.deleteAll();
+
+        IdentityVerificationAttempt attempt = new IdentityVerificationAttempt();
+        attempt.setAttemptId("att-expired-test");
+        attempt.setUser(testUser);
+        attempt.setStatus(VerificationAttemptStatus.LIVENESS_IN_PROGRESS);
+        attempt.setLivenessSessionId("sess-exp");
+        attempt.setStartedAt(LocalDateTime.now().minusMinutes(20));
+        attempt.setExpiresAt(LocalDateTime.now().minusMinutes(5)); // expired 5 mins ago
+        attemptRepository.save(attempt);
+
+        MockMultipartFile frame = new MockMultipartFile("frames", "f1.jpg", "image/jpeg", validJpegBytes);
+        mockMvc.perform(
+                multipart("/api/v1/identity/attempts/att-expired-test/liveness-step")
+                        .file(frame)
+                        .header("Authorization", "Bearer " + userToken)
+        )
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("IDENTITY_ATTEMPT_EXPIRED"));
+
+        verify(ocrClient, never()).verifyLivenessStep(any(), any());
+
+        IdentityVerificationAttempt expiredInDb = attemptRepository.findByAttemptId("att-expired-test").orElseThrow();
+        assertEquals(VerificationAttemptStatus.EXPIRED, expiredInDb.getStatus());
+        assertEquals(VerificationFailureCode.ATTEMPT_EXPIRED, expiredInDb.getFailureCode());
+    }
+
+    @Test
+    @DisplayName("Lỗi cơ sở dữ liệu không bị báo cáo nhầm là đã lưu thành công")
+    void testDatabaseErrorDuringFailureRecordingNotReportedAsSuccess() {
+        User invalidUser = new User();
+        invalidUser.setId(99999999L); // non-existent transient user ID violating foreign key
+        invalidUser.setUsername("ghost_user");
+
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> {
+            failureRecorder.recordInitialFailure(
+                    invalidUser, "hash", null, VerificationFailureCode.OCR_EXTRACT_FAILED, "DB failure test"
+            );
+        });
     }
 }

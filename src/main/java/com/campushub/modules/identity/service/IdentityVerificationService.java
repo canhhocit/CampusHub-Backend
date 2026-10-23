@@ -47,6 +47,7 @@ public class IdentityVerificationService {
     private final UploadService uploadService;
     private final AuditService auditService;
     private final IdentityProperties properties;
+    private final IdentityFailureRecorder failureRecorder;
 
     public IdentityVerificationService(
             IdentityVerificationAttemptRepository attemptRepository,
@@ -54,16 +55,18 @@ public class IdentityVerificationService {
             OcrServiceClient ocrClient,
             UploadService uploadService,
             AuditService auditService,
-            IdentityProperties properties) {
+            IdentityProperties properties,
+            IdentityFailureRecorder failureRecorder) {
         this.attemptRepository = attemptRepository;
         this.userRepository = userRepository;
         this.ocrClient = ocrClient;
         this.uploadService = uploadService;
         this.auditService = auditService;
         this.properties = properties;
+        this.failureRecorder = failureRecorder;
     }
 
-    @Transactional(noRollbackFor = AppException.class)
+    @Transactional
     public StartVerificationResponseDto startAttempt(String username, MultipartFile cardFile) {
         User user = userRepository.findByUsernameWithLock(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -107,21 +110,19 @@ public class IdentityVerificationService {
         }
 
         if (ocrResult == null || !ocrResult.isSuccess()) {
-            IdentityVerificationAttempt failedAttempt = createFailedAttempt(
-                    user, cardPhotoHash, VerificationFailureCode.OCR_EXTRACT_FAILED,
+            failureRecorder.recordInitialFailure(
+                    user, cardPhotoHash, null, VerificationFailureCode.OCR_EXTRACT_FAILED,
                     "Không thể trích xuất thông tin hợp lệ từ thẻ CCCD"
             );
-            attemptRepository.save(failedAttempt);
             throw new AppException(ErrorCode.IDENTITY_OCR_FAILED);
         }
 
         String citizenId = ocrResult.getCitizenId();
         if (citizenId == null || !citizenId.trim().matches("^[0-9]{12}$")) {
-            IdentityVerificationAttempt failedAttempt = createFailedAttempt(
-                    user, cardPhotoHash, VerificationFailureCode.INVALID_CITIZEN_ID,
+            failureRecorder.recordInitialFailure(
+                    user, cardPhotoHash, null, VerificationFailureCode.INVALID_CITIZEN_ID,
                     "Số CCCD không đúng định dạng 12 chữ số"
             );
-            attemptRepository.save(failedAttempt);
             throw new AppException(ErrorCode.INVALID_CITIZEN_ID);
         }
         citizenId = citizenId.trim();
@@ -129,12 +130,10 @@ public class IdentityVerificationService {
         // 5. Duplicate citizenId checks
         Optional<User> existingUser = userRepository.findByCitizenId(citizenId);
         if (existingUser.isPresent() && !existingUser.get().getId().equals(user.getId())) {
-            IdentityVerificationAttempt failedAttempt = createFailedAttempt(
-                    user, cardPhotoHash, VerificationFailureCode.CITIZEN_ID_DUPLICATE,
+            failureRecorder.recordInitialFailure(
+                    user, cardPhotoHash, citizenId, VerificationFailureCode.CITIZEN_ID_DUPLICATE,
                     "Số CCCD đã được sử dụng bởi tài khoản khác"
             );
-            failedAttempt.setCitizenId(citizenId);
-            attemptRepository.save(failedAttempt);
             throw new AppException(ErrorCode.CITIZEN_ID_ALREADY_EXISTS);
         }
 
@@ -144,12 +143,10 @@ public class IdentityVerificationService {
         );
         for (IdentityVerificationAttempt conflicting : conflictingAttempts) {
             if (!conflicting.getUser().getId().equals(user.getId())) {
-                IdentityVerificationAttempt failedAttempt = createFailedAttempt(
-                        user, cardPhotoHash, VerificationFailureCode.CITIZEN_ID_DUPLICATE,
+                failureRecorder.recordInitialFailure(
+                        user, cardPhotoHash, citizenId, VerificationFailureCode.CITIZEN_ID_DUPLICATE,
                         "Số CCCD đang chờ duyệt bởi tài khoản khác"
                 );
-                failedAttempt.setCitizenId(citizenId);
-                attemptRepository.save(failedAttempt);
                 throw new AppException(ErrorCode.CITIZEN_ID_ALREADY_EXISTS);
             }
         }
@@ -201,7 +198,7 @@ public class IdentityVerificationService {
         );
     }
 
-    @Transactional(noRollbackFor = AppException.class)
+    @Transactional
     public LivenessStepResultDto verifyLivenessStep(String username, String attemptId, List<MultipartFile> frames) {
         IdentityVerificationAttempt attempt = attemptRepository.findByAttemptId(attemptId)
                 .orElseThrow(() -> new AppException(ErrorCode.IDENTITY_ATTEMPT_NOT_FOUND));
@@ -211,8 +208,7 @@ public class IdentityVerificationService {
         }
 
         if (attempt.isExpired()) {
-            attempt.markExpired();
-            attemptRepository.save(attempt);
+            failureRecorder.recordExpired(attemptId);
             throw new AppException(ErrorCode.IDENTITY_ATTEMPT_EXPIRED);
         }
 
@@ -221,8 +217,8 @@ public class IdentityVerificationService {
         }
 
         if (attempt.getStepCount() >= properties.getMaxStepsPerAttempt()) {
-            attempt.markFailed(VerificationFailureCode.RATE_LIMIT_EXCEEDED, "Vượt quá số lần thử cử động liveness tối đa");
-            attemptRepository.save(attempt);
+            failureRecorder.recordStepFailure(attemptId, VerificationFailureCode.RATE_LIMIT_EXCEEDED,
+                    "Vượt quá số lần thử cử động liveness tối đa", null);
             throw new AppException(ErrorCode.IDENTITY_RATE_LIMIT_EXCEEDED);
         }
 
@@ -258,12 +254,9 @@ public class IdentityVerificationService {
 
         // Anti-spoofing check
         if (stepResponse.isSpoofDetected()) {
-            attempt.markFailed(VerificationFailureCode.LIVENESS_SPOOF_DETECTED, "Phát hiện giả mạo khuôn mặt (Spoof)");
-            attempt.setAntiSpoofingOutcome(stepResponse.getAntiSpoofingOutcome() != null ? stepResponse.getAntiSpoofingOutcome().name() : "SPOOF");
-            attemptRepository.save(attempt);
-
-            auditService.log(AuditAction.IDENTITY_ATTEMPT_FAILED, AuditEntityType.USER, attempt.getUser().getId(),
-                    "Spoof detected in attempt " + attemptId);
+            String outcome = stepResponse.getAntiSpoofingOutcome() != null ? stepResponse.getAntiSpoofingOutcome().name() : "SPOOF";
+            failureRecorder.recordStepFailure(attemptId, VerificationFailureCode.LIVENESS_SPOOF_DETECTED,
+                    "Phát hiện giả mạo khuôn mặt (Spoof)", outcome);
             throw new AppException(ErrorCode.IDENTITY_LIVENESS_FAILED);
         }
 
@@ -318,7 +311,7 @@ public class IdentityVerificationService {
         }
     }
 
-    @Transactional(noRollbackFor = AppException.class)
+    @Transactional
     public FaceVerificationResultDto verifyFaceAndComplete(
             String username, String attemptId, MultipartFile cardFile, MultipartFile selfieFile) {
 
@@ -330,8 +323,7 @@ public class IdentityVerificationService {
         }
 
         if (attempt.isExpired()) {
-            attempt.markExpired();
-            attemptRepository.save(attempt);
+            failureRecorder.recordExpired(attemptId);
             throw new AppException(ErrorCode.IDENTITY_ATTEMPT_EXPIRED);
         }
 
@@ -345,11 +337,8 @@ public class IdentityVerificationService {
         // Cryptographic card binding check
         String cardHash = sha256Hex(cardBytes);
         if (!cardHash.equalsIgnoreCase(attempt.getCardPhotoHash())) {
-            attempt.markFailed(VerificationFailureCode.CARD_HASH_MISMATCH, "Ảnh CCCD không khớp với ảnh đã OCR ở bước 1");
-            attemptRepository.save(attempt);
-
-            auditService.log(AuditAction.IDENTITY_ATTEMPT_FAILED, AuditEntityType.USER, attempt.getUser().getId(),
-                    "Card photo hash mismatch for attempt " + attemptId);
+            failureRecorder.recordStepFailure(attemptId, VerificationFailureCode.CARD_HASH_MISMATCH,
+                    "Ảnh CCCD không khớp với ảnh đã OCR ở bước 1", null);
             throw new AppException(ErrorCode.IDENTITY_CARD_MISMATCH);
         }
 
@@ -368,8 +357,8 @@ public class IdentityVerificationService {
         }
 
         if (faceResponse == null || !faceResponse.isSuccess()) {
-            attempt.markFailed(VerificationFailureCode.FACE_MISMATCH, "Dịch vụ đối chiếu khuôn mặt không trích xuất được khuôn mặt");
-            attemptRepository.save(attempt);
+            failureRecorder.recordStepFailure(attemptId, VerificationFailureCode.FACE_MISMATCH,
+                    "Dịch vụ đối chiếu khuôn mặt không trích xuất được khuôn mặt", null);
             throw new AppException(ErrorCode.IDENTITY_FACE_MISMATCH);
         }
 
@@ -378,12 +367,8 @@ public class IdentityVerificationService {
         attempt.setFaceMatched(faceResponse.getMatch());
 
         if (!Boolean.TRUE.equals(faceResponse.getMatch())) {
-            attempt.markFailed(VerificationFailureCode.FACE_MISMATCH,
-                    "Độ tương đồng (" + faceResponse.getSimilarityScore() + ") không đạt ngưỡng " + faceResponse.getThreshold());
-            attemptRepository.save(attempt);
-
-            auditService.log(AuditAction.IDENTITY_ATTEMPT_FAILED, AuditEntityType.USER, attempt.getUser().getId(),
-                    "Face match failed for attempt " + attemptId);
+            failureRecorder.recordStepFailure(attemptId, VerificationFailureCode.FACE_MISMATCH,
+                    "Độ tương đồng (" + faceResponse.getSimilarityScore() + ") không đạt ngưỡng " + faceResponse.getThreshold(), null);
             throw new AppException(ErrorCode.IDENTITY_FACE_MISMATCH);
         }
 
@@ -473,17 +458,6 @@ public class IdentityVerificationService {
         dto.setFailureCode(attempt.getFailureCode());
         dto.setFailureReason(attempt.getFailureReason());
         return dto;
-    }
-
-    private IdentityVerificationAttempt createFailedAttempt(User user, String cardHash, VerificationFailureCode code, String reason) {
-        IdentityVerificationAttempt attempt = new IdentityVerificationAttempt();
-        attempt.setAttemptId(UUID.randomUUID().toString());
-        attempt.setUser(user);
-        attempt.setCardPhotoHash(cardHash);
-        attempt.setStartedAt(LocalDateTime.now());
-        attempt.setExpiresAt(LocalDateTime.now().plusMinutes(properties.getAttemptTtlMinutes()));
-        attempt.markFailed(code, reason);
-        return attempt;
     }
 
     private byte[] validateAndExtractBytes(MultipartFile file) {

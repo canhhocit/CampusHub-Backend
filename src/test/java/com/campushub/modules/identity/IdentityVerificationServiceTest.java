@@ -15,6 +15,7 @@ import com.campushub.modules.identity.entity.IdentityVerificationAttempt;
 import com.campushub.modules.identity.enums.VerificationAttemptStatus;
 import com.campushub.modules.identity.enums.VerificationFailureCode;
 import com.campushub.modules.identity.repository.IdentityVerificationAttemptRepository;
+import com.campushub.modules.identity.service.IdentityFailureRecorder;
 import com.campushub.modules.identity.service.IdentityVerificationService;
 import com.campushub.modules.upload.service.UploadService;
 import com.campushub.modules.user.entity.User;
@@ -94,8 +95,9 @@ class IdentityVerificationServiceTest {
         properties.setAttemptTtlMinutes(15);
         properties.setMaxStepsPerAttempt(10);
 
+        IdentityFailureRecorder failureRecorder = new IdentityFailureRecorder(attemptRepository, auditService, properties);
         service = new IdentityVerificationService(
-                attemptRepository, userRepository, ocrClient, uploadService, auditService, properties
+                attemptRepository, userRepository, ocrClient, uploadService, auditService, properties, failureRecorder
         );
 
         testUser = new User();
