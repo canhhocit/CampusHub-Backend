@@ -69,6 +69,15 @@ public class Order extends BaseEntity {
     @Column(name = "payos_payment_link_id", length = 100)
     private String payosPaymentLinkId;
 
+    @Column(name = "payos_transaction_reference", length = 100)
+    private String payosTransactionReference;
+
+    @Column(name = "payos_checkout_url", columnDefinition = "TEXT")
+    private String payosCheckoutUrl;
+
+    @Column(name = "payos_qr_code", columnDefinition = "TEXT")
+    private String payosQrCode;
+
     @Column(name = "payment_paid_at")
     private LocalDateTime paymentPaidAt;
 
@@ -392,6 +401,30 @@ public class Order extends BaseEntity {
 
     public void setPayosPaymentLinkId(String payosPaymentLinkId) {
         this.payosPaymentLinkId = payosPaymentLinkId;
+    }
+
+    public String getPayosTransactionReference() {
+        return payosTransactionReference;
+    }
+
+    public void setPayosTransactionReference(String payosTransactionReference) {
+        this.payosTransactionReference = payosTransactionReference;
+    }
+
+    public String getPayosCheckoutUrl() {
+        return payosCheckoutUrl;
+    }
+
+    public void setPayosCheckoutUrl(String payosCheckoutUrl) {
+        this.payosCheckoutUrl = payosCheckoutUrl;
+    }
+
+    public String getPayosQrCode() {
+        return payosQrCode;
+    }
+
+    public void setPayosQrCode(String payosQrCode) {
+        this.payosQrCode = payosQrCode;
     }
 
     public LocalDateTime getPaymentPaidAt() {

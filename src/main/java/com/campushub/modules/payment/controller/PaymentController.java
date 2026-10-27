@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import vn.payos.model.webhooks.Webhook;
 
 import java.util.Map;
 
@@ -46,7 +47,7 @@ public class PaymentController {
 
     @PostMapping("/api/v1/orders/{id}/pay/simulate-success")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Mô phỏng quét mã PayOS thành công (dành cho demo & kiểm thử local không có public domain ngrok)")
+    @Operation(summary = "Mô phỏng quét mã PayOS thành công (chỉ cho phép ở môi trường local/test)")
     public ResponseEntity<PaymentResponse> simulatePayOSSuccess(
             @PathVariable Long id,
             Authentication authentication) {
@@ -56,8 +57,8 @@ public class PaymentController {
 
     @PostMapping("/api/v1/payments/payos/webhook")
     @Operation(summary = "Webhook tiếp nhận thông báo thanh toán thành công tự động từ PayOS")
-    public ResponseEntity<Map<String, Object>> handlePayOSWebhook(@RequestBody Map<String, Object> payload) {
-        Map<String, Object> result = paymentService.processPayOSWebhookPayload(payload);
+    public ResponseEntity<Map<String, Object>> handlePayOSWebhook(@RequestBody Webhook webhook) {
+        Map<String, Object> result = paymentService.processPayOSWebhook(webhook);
         return ResponseEntity.ok(result);
     }
 }

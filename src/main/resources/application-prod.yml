@@ -11,3 +11,5 @@ app:
     secret: ${JWT_SECRET}
   security:
     pickup-encryption-key: ${PICKUP_ENCRYPTION_KEY}
+  payos:
+    simulation-enabled: false

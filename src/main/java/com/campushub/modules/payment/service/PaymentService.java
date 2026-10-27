@@ -14,10 +14,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
+import vn.payos.model.webhooks.Webhook;
+import vn.payos.model.webhooks.WebhookData;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class PaymentService {
@@ -60,10 +62,20 @@ public class PaymentService {
 
             PaymentResponse response = buildPaymentResponse(order);
             response.setSuccess(true);
-            response.setMessage("Thanh toán giả lập thành công! Tiền cọc/tiền hàng đã được đưa vào trạng thái bảo chứng (Escrow).");
+            response.setMessage("Thanh toán giả lập thành công. Đơn hàng đã được xác nhận thanh toán.");
             return response;
         } else if (method == PaymentMethod.PAYOS) {
             // Luồng 2: Thanh toán VietQR qua PayOS
+            // Nếu đã tạo link trước đó và chưa thanh toán, tái sử dụng link hiện tại để tránh sinh duplicate link
+            if (order.getPayosOrderCode() != null && order.getPayosCheckoutUrl() != null) {
+                PaymentResponse response = buildPaymentResponse(order);
+                response.setSuccess(true);
+                response.setCheckoutUrl(order.getPayosCheckoutUrl());
+                response.setQrCode(order.getPayosQrCode());
+                response.setMessage("Liên kết thanh toán VietQR qua PayOS đã sẵn sàng. Vui lòng quét mã QR hoặc mở liên kết để hoàn tất thanh toán.");
+                return response;
+            }
+
             Long orderCode = order.getPayosOrderCode();
             if (orderCode == null) {
                 orderCode = payOSService.generateOrderCode(order.getId());
@@ -73,13 +85,15 @@ public class PaymentService {
 
             CreatePaymentLinkResponse linkResponse = payOSService.createPaymentLink(order, orderCode);
             order.setPayosPaymentLinkId(linkResponse.getPaymentLinkId());
+            order.setPayosCheckoutUrl(linkResponse.getCheckoutUrl());
+            order.setPayosQrCode(linkResponse.getQrCode());
             orderRepository.save(order);
 
             PaymentResponse response = buildPaymentResponse(order);
             response.setSuccess(true);
             response.setCheckoutUrl(linkResponse.getCheckoutUrl());
             response.setQrCode(linkResponse.getQrCode());
-            response.setMessage("Tạo link thanh toán VietQR qua PayOS thành công. Vui lòng quét mã QR hoặc mở liên kết để thanh toán.");
+            response.setMessage("Tạo liên kết thanh toán VietQR qua PayOS thành công. Vui lòng quét mã QR hoặc mở liên kết để thanh toán.");
             return response;
         } else {
             throw new AppException(ErrorCode.INVALID_PAYMENT_STATUS);
@@ -101,20 +115,14 @@ public class PaymentService {
         PaymentResponse response = buildPaymentResponse(order);
         response.setSuccess(true);
 
-        // Nếu đã tạo link PayOS nhưng chưa thanh toán, lấy lại QR Code tiện lợi cho Frontend
-        if (order.getPaymentMethod() == PaymentMethod.PAYOS && order.getPaymentStatus() != PaymentStatus.PAID
-                && order.getPayosOrderCode() != null) {
-            try {
-                CreatePaymentLinkResponse linkResponse = payOSService.createPaymentLink(order, order.getPayosOrderCode());
-                response.setCheckoutUrl(linkResponse.getCheckoutUrl());
-                response.setQrCode(linkResponse.getQrCode());
-            } catch (Exception e) {
-                log.warn("Không thể refresh PayOS link cho order #{}: {}", orderId, e.getMessage());
-            }
+        // Lấy lại URL và QR code đã lưu từ trước cho Frontend mà không gọi API tạo link mới
+        if (order.getPaymentMethod() == PaymentMethod.PAYOS) {
+            response.setCheckoutUrl(order.getPayosCheckoutUrl());
+            response.setQrCode(order.getPayosQrCode());
         }
 
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
-            response.setMessage("Đơn hàng đã được thanh toán và tiền đang được giữ trong tài khoản Escrow.");
+            response.setMessage("Đơn hàng đã được ghi nhận thanh toán thành công.");
         } else {
             response.setMessage("Đơn hàng chưa được thanh toán.");
         }
@@ -123,57 +131,95 @@ public class PaymentService {
     }
 
     @Transactional
-    public Map<String, Object> processPayOSWebhookPayload(Map<String, Object> payload) {
-        try {
-            if (payload == null || !payload.containsKey("data")) {
-                log.warn("PayOS webhook payload is null or missing data");
-                return Map.of("code", "01", "desc", "Dữ liệu webhook không hợp lệ");
-            }
-
-            Object dataObj = payload.get("data");
-            Long orderCode = null;
-            if (dataObj instanceof Map<?, ?> dataMap) {
-                Object oc = dataMap.get("orderCode");
-                if (oc instanceof Number num) {
-                    orderCode = num.longValue();
-                } else if (oc != null) {
-                    orderCode = Long.parseLong(oc.toString().trim());
-                }
-            }
-
-            if (orderCode == null) {
-                return Map.of("code", "01", "desc", "Thiếu orderCode trong data");
-            }
-
-            Optional<Order> orderOpt = orderRepository.findByPayosOrderCode(orderCode);
-            if (orderOpt.isEmpty()) {
-                log.warn("PayOS webhook orderCode không tồn tại trong hệ thống: {}", orderCode);
-                return Map.of("code", "00", "desc", "Đã nhận webhook nhưng không tìm thấy đơn hàng");
-            }
-
-            Order order = orderOpt.get();
-            if (order.getPaymentStatus() != PaymentStatus.PAID) {
-                order.setPaymentStatus(PaymentStatus.PAID);
-                order.setPaymentMethod(PaymentMethod.PAYOS);
-                order.setPaymentPaidAt(LocalDateTime.now());
-                orderRepository.save(order);
-                log.info("Xác nhận thanh toán PayOS thành công cho đơn #{} (orderCode={}) qua Webhook", order.getId(), orderCode);
-            }
-
-            return Map.of("code", "00", "desc", "success");
-        } catch (Exception e) {
-            log.error("Lỗi khi xử lý PayOS webhook payload: {}", e.getMessage(), e);
-            return Map.of("code", "01", "desc", e.getMessage());
+    public Map<String, Object> processPayOSWebhook(Webhook webhook) {
+        // 1. Xác thực chữ ký webhook bằng chính thức PayOS SDK
+        WebhookData webhookData = payOSService.verifyWebhook(webhook);
+        if (webhookData == null) {
+            throw new AppException(ErrorCode.PAYMENT_SIGNATURE_INVALID, "Dữ liệu webhook PayOS không hợp lệ");
         }
+
+        // 2. Xác thực sự kiện thanh toán thành công theo chuẩn payload PayOS
+        if (!"00".equals(webhook.getCode()) || (webhookData.getCode() != null && !"00".equals(webhookData.getCode()))) {
+            log.warn("PayOS webhook reported non-success payment event: webhookCode={}, dataCode={}",
+                    webhook.getCode(), webhookData.getCode());
+            throw new AppException(ErrorCode.PAYMENT_FAILED,
+                    "Sự kiện thanh toán PayOS không thành công (code: " + webhook.getCode() + ")");
+        }
+
+        // 3. Khóa hàng theo payosOrderCode (Pessimistic Lock) để chống xung đột đồng thời và bảo đảm Idempotency
+        Long orderCode = webhookData.getOrderCode();
+        if (orderCode == null) {
+            throw new AppException(ErrorCode.INVALID_ORDER_STATUS, "Thiếu orderCode trong dữ liệu webhook PayOS");
+        }
+
+        Order order = orderRepository.findByPayosOrderCodeWithLock(orderCode)
+                .orElseThrow(() -> {
+                    log.warn("PayOS webhook orderCode không tồn tại trong hệ thống: {}", orderCode);
+                    return new AppException(ErrorCode.ORDER_NOT_FOUND, "Không tìm thấy đơn hàng với mã PayOS: " + orderCode);
+                });
+
+        // 4. Xử lý webhook trùng lặp an toàn (Idempotent)
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            log.info("PayOS webhook duplicate notification for already paid order #{} (orderCode={})", order.getId(), orderCode);
+            return Map.of("code", "00", "desc", "success");
+        }
+
+        // 5. Đối soát số tiền thanh toán nhận được so với số tiền của đơn hàng
+        Long receivedAmount = webhookData.getAmount();
+        if (receivedAmount == null) {
+            throw new AppException(ErrorCode.INVALID_PAYMENT_AMOUNT, "Thiếu số tiền trong dữ liệu thanh toán PayOS");
+        }
+
+        BigDecimal expectedAmount = order.getTotalAmount();
+        if (expectedAmount.compareTo(BigDecimal.valueOf(receivedAmount)) != 0) {
+            log.error("PayOS webhook amount mismatch for order #{}: expected={}, received={}",
+                    order.getId(), expectedAmount, receivedAmount);
+            throw new AppException(ErrorCode.INVALID_PAYMENT_AMOUNT,
+                    "Số tiền thanh toán (" + receivedAmount + " VNĐ) không khớp với giá trị đơn hàng (" + expectedAmount + " VNĐ)");
+        }
+
+        // 6. Kiểm tra trạng thái đơn hàng có hợp lệ để nhận thanh toán
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.REJECTED
+                || order.getStatus() == OrderStatus.EXPIRED) {
+            log.error("PayOS webhook received for order #{} in invalid status: {}", order.getId(), order.getStatus());
+            throw new AppException(ErrorCode.INVALID_ORDER_STATUS, "Đơn hàng đã bị hủy hoặc hết hạn, không thể nhận thanh toán");
+        }
+
+        // 7. Cập nhật trạng thái thanh toán đơn hàng
+        order.setPaymentStatus(PaymentStatus.PAID);
+        order.setPaymentMethod(PaymentMethod.PAYOS);
+        order.setPaymentPaidAt(LocalDateTime.now());
+        if (webhookData.getReference() != null && !webhookData.getReference().isBlank()) {
+            order.setPayosTransactionReference(webhookData.getReference());
+        }
+        orderRepository.save(order);
+
+        log.info("Xác nhận thanh toán PayOS thành công cho đơn #{} (orderCode={}, amount={}, ref={}) qua Webhook",
+                order.getId(), orderCode, receivedAmount, webhookData.getReference());
+
+        return Map.of("code", "00", "desc", "success");
     }
 
     @Transactional
     public PaymentResponse simulateWebhookSuccess(Long orderId, String username) {
+        if (!payOSService.isSimulationAllowed()) {
+            throw new AppException(ErrorCode.SIMULATION_NOT_ALLOWED);
+        }
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
         if (!order.getBuyer().getUsername().equals(username)) {
             throw new AppException(ErrorCode.UNAUTHORIZED_ACTION);
+        }
+
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new AppException(ErrorCode.ORDER_ALREADY_PAID);
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.REJECTED
+                || order.getStatus() == OrderStatus.EXPIRED) {
+            throw new AppException(ErrorCode.INVALID_ORDER_STATUS);
         }
 
         order.setPaymentMethod(PaymentMethod.PAYOS);
@@ -183,7 +229,7 @@ public class PaymentService {
 
         PaymentResponse response = buildPaymentResponse(order);
         response.setSuccess(true);
-        response.setMessage("Giả lập Webhook PayOS thành công! Đơn hàng đã chuyển sang trạng thái ĐÃ THANH TOÁN.");
+        response.setMessage("Mô phỏng thanh toán PayOS thành công. Đơn hàng đã chuyển sang trạng thái đã thanh toán.");
         return response;
     }
 

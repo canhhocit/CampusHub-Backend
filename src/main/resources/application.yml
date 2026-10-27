@@ -66,6 +66,7 @@ app:
     checksum-key: ${PAYOS_CHECKSUM_KEY:}
     return-url: ${PAYOS_RETURN_URL:http://localhost:5173/orders}
     cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/orders}
+    simulation-enabled: ${PAYOS_SIMULATION_ENABLED:true}
   ping:
     enabled: ${SELF_PING_ENABLED:true}
     url: ${SELF_PING_URL:${RENDER_EXTERNAL_URL:}}

@@ -28,6 +28,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByPayosOrderCode(Long payosOrderCode);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.payosOrderCode = :payosOrderCode")
+    Optional<Order> findByPayosOrderCodeWithLock(@Param("payosOrderCode") Long payosOrderCode);
+
     Page<Order> findByBuyerId(Long buyerId, Pageable pageable);
 
     Page<Order> findBySellerId(Long sellerId, Pageable pageable);
