@@ -60,6 +60,7 @@ public class OrderService {
     private final OrderAttemptService orderAttemptService;
     private final com.campushub.modules.audit.service.AuditService auditService;
     private final com.campushub.modules.admin.service.SystemSettingService systemSettingService;
+    private final com.campushub.modules.wallet.service.WalletService walletService;
 
     // Transient in-memory cache for fast lookup during active session
     private final Map<Long, String> activePickupCodes = new ConcurrentHashMap<>();
@@ -76,7 +77,8 @@ public class OrderService {
                         AesEncryptionService aesEncryptionService,
                         OrderAttemptService orderAttemptService,
                         com.campushub.modules.audit.service.AuditService auditService,
-                        com.campushub.modules.admin.service.SystemSettingService systemSettingService) {
+                        com.campushub.modules.admin.service.SystemSettingService systemSettingService,
+                        com.campushub.modules.wallet.service.WalletService walletService) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
@@ -89,6 +91,7 @@ public class OrderService {
         this.orderAttemptService = orderAttemptService;
         this.auditService = auditService;
         this.systemSettingService = systemSettingService;
+        this.walletService = walletService;
     }
 
     private OrderResponse mapToOrderResponse(Order order) {
@@ -605,6 +608,7 @@ public class OrderService {
         } else {
             order.setStatus(OrderStatus.COMPLETED);
             product.setStatus(ProductStatus.SOLD);
+            walletService.creditOrderPayout(order);
         }
         productRepository.save(product);
 
@@ -772,6 +776,9 @@ public class OrderService {
         productRepository.save(product);
 
         order = orderRepository.save(order);
+
+        walletService.creditOrderPayout(order);
+        walletService.refundRentalDeposit(order);
 
         // Notify buyer that deposit refund/settlement is completed
         String subject = "CampusHub - Hoàn tất trả đồ thuê: Đơn " + order.getOrderNumber();

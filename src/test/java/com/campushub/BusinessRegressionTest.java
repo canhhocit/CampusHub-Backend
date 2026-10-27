@@ -64,12 +64,16 @@ class BusinessRegressionTest {
     @Autowired JwtProvider jwt;
     @Autowired MockMvc mvc;
     @Autowired PlatformTransactionManager transactionManager;
+    @Autowired(required = false) com.campushub.modules.wallet.repository.WalletTransactionRepository walletTransactions;
+    @Autowired(required = false) com.campushub.modules.wallet.repository.WalletRepository wallets;
     User buyer, seller;
     Product product;
     Locker locker;
     Compartment compartment;
 
     @BeforeEach void setup() {
+        if (walletTransactions != null) walletTransactions.deleteAll();
+        if (wallets != null) wallets.deleteAll();
         orders.deleteAll(); products.deleteAll(); compartments.deleteAll(); lockers.deleteAll();
         verificationTokens.deleteAll(); refreshTokens.deleteAll(); users.deleteAll(); categories.deleteAll();
         seller = user("seller"); buyer = user("buyer");

@@ -64,7 +64,13 @@ public enum ErrorCode {
     IDENTITY_CARD_MISMATCH(HttpStatus.BAD_REQUEST, "Ảnh thẻ CCCD cung cấp không trùng khớp với ảnh đã trích xuất ban đầu"),
     IDENTITY_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Bạn đã vượt quá số lần thử xác minh trong ngày. Vui lòng thử lại sau."),
     IDENTITY_VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "Vui lòng hoàn thành luồng xác minh eKYC trực tuyến (OCR, Liveness, Face Match)."),
-    IDENTITY_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dịch vụ nhận diện sinh trắc học hiện không khả dụng. Vui lòng thử lại sau.");
+    IDENTITY_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dịch vụ nhận diện sinh trắc học hiện không khả dụng. Vui lòng thử lại sau."),
+    WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy ví của người dùng"),
+    INSUFFICIENT_WALLET_BALANCE(HttpStatus.BAD_REQUEST, "Số dư ví không đủ để thực hiện giao dịch"),
+    INVALID_WITHDRAWAL_AMOUNT(HttpStatus.BAD_REQUEST, "Số tiền rút không hợp lệ (tối thiểu 10,000 VNĐ)"),
+    BANK_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy thông tin tài khoản ngân hàng"),
+    PAYOUT_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu rút tiền"),
+    PAYOUT_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "Yêu cầu rút tiền này đã được xử lý trước đó");
 
     private final HttpStatus status;
     private final String message;
