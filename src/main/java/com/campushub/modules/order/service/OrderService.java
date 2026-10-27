@@ -17,6 +17,7 @@ import com.campushub.modules.order.dto.*;
 import com.campushub.modules.order.entity.Order;
 import com.campushub.modules.order.entity.OrderStatus;
 import com.campushub.modules.order.entity.OrderType;
+import com.campushub.modules.order.entity.PaymentStatus;
 import com.campushub.modules.order.repository.OrderRepository;
 import com.campushub.modules.user.entity.User;
 import com.campushub.modules.user.repository.UserRepository;
@@ -426,6 +427,9 @@ public class OrderService {
         }
 
         order = orderRepository.save(order);
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            walletService.refundOrderPayment(order, "Hoàn tiền do người bán từ chối đơn hàng");
+        }
         return mapToOrderResponse(order);
     }
 
@@ -448,6 +452,9 @@ public class OrderService {
         order.setCancelledAt(LocalDateTime.now());
 
         order = orderRepository.save(order);
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            walletService.refundOrderPayment(order, "Hoàn tiền do người mua hủy đơn hàng");
+        }
         return mapToOrderResponse(order);
     }
 
@@ -810,6 +817,10 @@ public class OrderService {
             order.setPickupCodeHash(null);
             activePickupCodes.remove(order.getId());
             orderRepository.save(order);
+
+            if (order.getPaymentStatus() == PaymentStatus.PAID) {
+                walletService.refundOrderPayment(order, "Hoàn tiền do đơn hàng quá hạn nhận");
+            }
 
             sendEmailAfterCommit(
                     order.getBuyer().getEmail(),

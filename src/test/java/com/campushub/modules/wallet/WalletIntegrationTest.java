@@ -433,4 +433,75 @@ public class WalletIntegrationTest {
                         .content("{}"))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void testPaidOrderCancellationRefundsBuyerWallet() {
+        BigDecimal initialBuyerBalance = walletRepository.findByUserId(buyer.getId())
+                .map(Wallet::getBalance).orElse(BigDecimal.ZERO);
+
+        Product prod = new Product();
+        prod.setTitle("Refund Test Item");
+        prod.setDescription("Description");
+        prod.setPrice(new BigDecimal("120000.00"));
+        prod.setCategory(category);
+        prod.setOwner(seller);
+        prod.setStatus(ProductStatus.ACTIVE);
+        prod = productRepository.save(prod);
+
+        Order order = new Order();
+        order.setOrderNumber("ORD-REFUND-" + System.nanoTime());
+        order.setBuyer(buyer);
+        order.setSeller(seller);
+        order.setProduct(prod);
+        order.setPriceSnapshot(new BigDecimal("120000.00"));
+        order.setStatus(OrderStatus.PENDING_SELLER);
+        order.setPaymentStatus(PaymentStatus.PAID);
+        order = orderRepository.save(order);
+
+        // Buyer cancels order
+        orderService.cancelOrder(order.getId(), buyer.getUsername());
+
+        // Verify order is cancelled
+        Order cancelled = orderRepository.findById(order.getId()).orElseThrow();
+        assertEquals(OrderStatus.CANCELLED, cancelled.getStatus());
+
+        // Verify buyer received full refund into wallet
+        Wallet buyerWallet = walletRepository.findByUserId(buyer.getId()).orElseThrow();
+        assertEquals(0, initialBuyerBalance.add(new BigDecimal("120000.00")).compareTo(buyerWallet.getBalance()));
+        assertTrue(walletTransactionRepository.existsByOrderIdAndType(order.getId(), TransactionType.ORDER_REFUND));
+    }
+
+    @Test
+    void testUnpaidOrderCompletionSkipsPayout() {
+        Product prod = new Product();
+        prod.setTitle("Unpaid Payout Guard Test Item");
+        prod.setDescription("Description");
+        prod.setPrice(new BigDecimal("75000.00"));
+        prod.setCategory(category);
+        prod.setOwner(seller);
+        prod.setStatus(ProductStatus.ACTIVE);
+        prod = productRepository.save(prod);
+
+        Order order = new Order();
+        order.setOrderNumber("ORD-UNPAID-GUARD-" + System.nanoTime());
+        order.setBuyer(buyer);
+        order.setSeller(seller);
+        order.setProduct(prod);
+        order.setPriceSnapshot(new BigDecimal("75000.00"));
+        order.setSellerPayout(new BigDecimal("70000.00"));
+        order.setStatus(OrderStatus.COMPLETED);
+        order.setPaymentStatus(PaymentStatus.UNPAID);
+        order = orderRepository.save(order);
+
+        BigDecimal beforeBalance = walletRepository.findByUserId(seller.getId())
+                .map(Wallet::getBalance).orElse(BigDecimal.ZERO);
+
+        // Call creditOrderPayout on unpaid order
+        walletService.creditOrderPayout(order);
+
+        // Verify seller wallet was NOT credited
+        Wallet sellerWallet = walletRepository.findByUserId(seller.getId()).orElseThrow();
+        assertEquals(0, beforeBalance.compareTo(sellerWallet.getBalance()));
+        assertFalse(walletTransactionRepository.existsByOrderIdAndType(order.getId(), TransactionType.ORDER_PAYOUT));
+    }
 }

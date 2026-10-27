@@ -3,6 +3,7 @@ package com.campushub.modules.wallet.service;
 import com.campushub.common.exception.AppException;
 import com.campushub.common.exception.ErrorCode;
 import com.campushub.modules.order.entity.Order;
+import com.campushub.modules.order.entity.PaymentStatus;
 import com.campushub.modules.user.entity.User;
 import com.campushub.modules.user.repository.UserRepository;
 import com.campushub.modules.wallet.dto.*;
@@ -78,6 +79,11 @@ public class WalletService {
             return;
         }
 
+        if (order.getPaymentStatus() != PaymentStatus.PAID) {
+            log.warn("Order #{} is not PAID (status: {}), skipping payout credit", order.getId(), order.getPaymentStatus());
+            return;
+        }
+
         BigDecimal payout = order.getSellerPayout();
         if (payout == null || payout.compareTo(BigDecimal.ZERO) <= 0) {
             log.info("Order #{} has no seller payout to credit", order.getId());
@@ -119,6 +125,11 @@ public class WalletService {
             return;
         }
 
+        if (order.getPaymentStatus() != PaymentStatus.PAID) {
+            log.warn("Order #{} is not PAID (status: {}), skipping deposit refund", order.getId(), order.getPaymentStatus());
+            return;
+        }
+
         BigDecimal deposit = order.getDepositAmount();
         if (deposit == null || deposit.compareTo(BigDecimal.ZERO) <= 0) {
             return;
@@ -151,6 +162,52 @@ public class WalletService {
 
         log.info("Refunded rental deposit {} VND for order #{} to user #{} (new balance: {})",
                 deposit, order.getId(), buyerId, after);
+    }
+
+    @Transactional
+    public void refundOrderPayment(Order order, String reason) {
+        if (order == null || order.getId() == null) {
+            return;
+        }
+
+        if (order.getPaymentStatus() != PaymentStatus.PAID) {
+            log.info("Order #{} is not PAID (status: {}), skipping cancellation refund", order.getId(), order.getPaymentStatus());
+            return;
+        }
+
+        BigDecimal total = (order.getPriceSnapshot() != null ? order.getPriceSnapshot() : BigDecimal.ZERO)
+                .add(order.getDepositAmount() != null ? order.getDepositAmount() : BigDecimal.ZERO);
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        if (walletTransactionRepository.existsByOrderIdAndType(order.getId(), TransactionType.ORDER_REFUND)) {
+            log.warn("Order refund already processed for order #{}", order.getId());
+            return;
+        }
+
+        Long buyerId = order.getBuyer().getId();
+        getOrCreateWallet(buyerId);
+        Wallet wallet = walletRepository.findByUserIdWithLock(buyerId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+
+        BigDecimal before = wallet.getBalance();
+        BigDecimal after = before.add(total);
+        wallet.setBalance(after);
+        walletRepository.save(wallet);
+
+        WalletTransaction tx = new WalletTransaction();
+        tx.setWallet(wallet);
+        tx.setOrderId(order.getId());
+        tx.setType(TransactionType.ORDER_REFUND);
+        tx.setAmount(total);
+        tx.setBalanceBefore(before);
+        tx.setBalanceAfter(after);
+        tx.setDescription((reason != null && !reason.isBlank() ? reason : "Hoàn tiền đơn hàng") + " " + order.getOrderNumber());
+        walletTransactionRepository.save(tx);
+
+        log.info("Refunded order payment {} VND for order #{} to buyer #{} (new balance: {})",
+                total, order.getId(), buyerId, after);
     }
 
     @Transactional
