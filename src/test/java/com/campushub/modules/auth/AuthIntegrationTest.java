@@ -18,8 +18,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
-
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -71,7 +69,7 @@ public class AuthIntegrationTest {
         
         // Ensure token was created
         assertEquals(1, verificationTokenRepository.count());
-        VerificationToken vt = verificationTokenRepository.findAll().get(0);
+        assertNotNull(verificationTokenRepository.findAll().get(0).getTokenHash());
         
         // 2. Login fails because PENDING
         LoginRequest loginReq = new LoginRequest();

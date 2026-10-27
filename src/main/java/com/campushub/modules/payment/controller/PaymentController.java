@@ -15,6 +15,7 @@ import vn.payos.model.webhooks.Webhook;
 import java.util.Map;
 
 @RestController
+@RequestMapping("/api/v1")
 @Tag(name = "Payment", description = "Thanh toán cọc/đơn hàng (Mock & PayOS)")
 public class PaymentController {
 
@@ -24,7 +25,7 @@ public class PaymentController {
         this.paymentService = paymentService;
     }
 
-    @PostMapping("/api/v1/orders/{id}/pay")
+    @PostMapping("/orders/{id}/pay")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Khởi tạo hoặc thực hiện thanh toán cho đơn hàng (hỗ trợ MOCK hoặc PAYOS)")
     public ResponseEntity<PaymentResponse> payOrder(
@@ -35,7 +36,7 @@ public class PaymentController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/api/v1/orders/{id}/payment-status")
+    @GetMapping("/orders/{id}/payment-status")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Lấy trạng thái thanh toán hiện tại của đơn hàng (dùng cho polling giao diện)")
     public ResponseEntity<PaymentResponse> getPaymentStatus(
@@ -45,7 +46,7 @@ public class PaymentController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/api/v1/orders/{id}/pay/simulate-success")
+    @PostMapping("/orders/{id}/pay/simulate-success")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Mô phỏng quét mã PayOS thành công (chỉ cho phép ở môi trường local/test)")
     public ResponseEntity<PaymentResponse> simulatePayOSSuccess(
@@ -55,7 +56,7 @@ public class PaymentController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/api/v1/payments/payos/webhook")
+    @PostMapping("/payments/payos/webhook")
     @Operation(summary = "Webhook tiếp nhận thông báo thanh toán thành công tự động từ PayOS")
     public ResponseEntity<Map<String, Object>> handlePayOSWebhook(@RequestBody Webhook webhook) {
         Map<String, Object> result = paymentService.processPayOSWebhook(webhook);

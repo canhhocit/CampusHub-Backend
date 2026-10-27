@@ -3,12 +3,10 @@ package com.campushub.modules.locker.repository;
 import com.campushub.modules.locker.entity.Compartment;
 import com.campushub.modules.locker.entity.CompartmentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
-@Repository
 public interface CompartmentRepository extends JpaRepository<Compartment, Long> {
 
     boolean existsByLockerIdAndCode(Long lockerId, String code);

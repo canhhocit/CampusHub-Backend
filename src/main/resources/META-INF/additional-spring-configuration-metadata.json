@@ -1,0 +1,111 @@
+{
+  "groups": [
+    {
+      "name": "app",
+      "type": "java.lang.Object",
+      "description": "Application custom configuration properties."
+    }
+  ],
+  "properties": [
+    {
+      "name": "app.frontend.url",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.mail.from",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.mail.sender-name",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.jwt.secret",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.jwt.expiration-ms",
+      "type": "java.lang.Long"
+    },
+    {
+      "name": "app.jwt.refresh-expiration-ms",
+      "type": "java.lang.Long"
+    },
+    {
+      "name": "app.jwt.cookie-secure",
+      "type": "java.lang.Boolean"
+    },
+    {
+      "name": "app.security.pickup-encryption-key",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.admin.email",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.admin.password",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.ping.enabled",
+      "type": "java.lang.Boolean"
+    },
+    {
+      "name": "app.ocr.base-url",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.ocr.connect-timeout-ms",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "app.ocr.read-timeout-ms",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "app.identity.max-daily-attempts",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "app.identity.attempt-ttl-minutes",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "app.identity.max-steps-per-attempt",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "app.payos.client-id",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.payos.api-key",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.payos.checksum-key",
+      "type": "java.lang.String"
+    },
+    {
+      "name": "app.payos.simulation-enabled",
+      "type": "java.lang.Boolean"
+    },
+    {
+      "name": "app.order.expiration-check-interval-ms",
+      "type": "java.lang.Long"
+    },
+    {
+      "name": "app.locker.base-pickup-duration-hours",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "app.locker.max-pickup-duration-hours",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "app.platform.fee-percent",
+      "type": "java.math.BigDecimal"
+    }
+  ]
+}

@@ -9,7 +9,6 @@ import com.campushub.modules.locker.entity.LockerStatus;
 import com.campushub.modules.locker.repository.CompartmentRepository;
 import com.campushub.modules.locker.repository.LockerRepository;
 import com.campushub.modules.marketplace.entity.Category;
-import com.campushub.modules.marketplace.entity.ListingType;
 import com.campushub.modules.marketplace.entity.Product;
 import com.campushub.modules.marketplace.entity.ProductStatus;
 import com.campushub.modules.marketplace.repository.CategoryRepository;
@@ -90,23 +89,16 @@ public class WalletIntegrationTest {
     private WalletService walletService;
 
     @Autowired
-    private PayoutAdminService payoutAdminService;
-
-    @Autowired
     private WalletRepository walletRepository;
 
     @Autowired
     private WalletTransactionRepository walletTransactionRepository;
 
     @Autowired
-    private UserBankAccountRepository userBankAccountRepository;
-
-    @Autowired
     private PayoutRequestRepository payoutRequestRepository;
 
     private User buyer;
     private User seller;
-    private User admin;
     private Locker locker;
     private Compartment compartment;
     private Category category;
@@ -135,7 +127,7 @@ public class WalletIntegrationTest {
             return userRepository.save(u);
         });
 
-        admin = userRepository.findByUsername("wallet_admin").orElseGet(() -> {
+        userRepository.findByUsername("wallet_admin").orElseGet(() -> {
             User u = new User();
             u.setUsername("wallet_admin");
             u.setEmail("wallet_admin@test.com");

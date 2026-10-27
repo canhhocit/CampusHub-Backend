@@ -21,7 +21,6 @@ import com.campushub.modules.order.dto.OrderCreateRequest;
 import com.campushub.modules.order.dto.OrderPickupRequest;
 import com.campushub.modules.order.dto.OrderReturnRequest;
 import com.campushub.modules.order.entity.Order;
-import com.campushub.modules.order.entity.OrderStatus;
 import com.campushub.modules.order.entity.OrderType;
 import com.campushub.modules.order.repository.OrderRepository;
 import com.campushub.modules.order.service.OrderService;
@@ -45,7 +44,6 @@ import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
