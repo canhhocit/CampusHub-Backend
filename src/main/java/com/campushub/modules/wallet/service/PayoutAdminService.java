@@ -2,6 +2,7 @@ package com.campushub.modules.wallet.service;
 
 import com.campushub.common.exception.AppException;
 import com.campushub.common.exception.ErrorCode;
+import com.campushub.modules.notification.service.NotificationService;
 import com.campushub.modules.user.entity.User;
 import com.campushub.modules.user.repository.UserRepository;
 import com.campushub.modules.wallet.dto.AdminPayoutActionRequest;
@@ -34,19 +35,22 @@ public class PayoutAdminService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final UserRepository userRepository;
     private final WalletService walletService;
+    private final NotificationService notificationService;
 
     public PayoutAdminService(
             PayoutRequestRepository payoutRequestRepository,
             WalletRepository walletRepository,
             WalletTransactionRepository walletTransactionRepository,
             UserRepository userRepository,
-            WalletService walletService
+            WalletService walletService,
+            NotificationService notificationService
     ) {
         this.payoutRequestRepository = payoutRequestRepository;
         this.walletRepository = walletRepository;
         this.walletTransactionRepository = walletTransactionRepository;
         this.userRepository = userRepository;
         this.walletService = walletService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -92,6 +96,17 @@ public class PayoutAdminService {
         payout.setProcessedBy(admin);
         payout.setProcessedAt(LocalDateTime.now());
         payout = payoutRequestRepository.save(payout);
+
+        notificationService.createNotification(
+                payout.getUser(),
+                "Yêu cầu rút tiền đã được duyệt",
+                String.format("Yêu cầu rút %,.0f VNĐ về tài khoản %s (%s) đã được xử lý thành công.%s",
+                        payout.getAmount(), payout.getAccountNumber(), payout.getBankCode(),
+                        payout.getReferenceCode() != null ? " Mã GD: " + payout.getReferenceCode() : ""),
+                "PAYOUT_APPROVED",
+                "WALLET",
+                payout.getId()
+        );
 
         log.info("Admin {} approved payout request #{} (amount={} VND, ref={})",
                 adminUsername, payout.getId(), payout.getAmount(), payout.getReferenceCode());
@@ -142,6 +157,16 @@ public class PayoutAdminService {
         tx.setBalanceAfter(after);
         tx.setDescription("Hoàn tiền yêu cầu rút tiền bị từ chối: " + note);
         walletTransactionRepository.save(tx);
+
+        notificationService.createNotification(
+                payout.getUser(),
+                "Yêu cầu rút tiền bị từ chối",
+                String.format("Yêu cầu rút %,.0f VNĐ bị từ chối. Lý do: %s. Số tiền đã được hoàn trả về số dư khả dụng.",
+                        payout.getAmount(), note),
+                "PAYOUT_REJECTED",
+                "WALLET",
+                payout.getId()
+        );
 
         log.info("Admin {} rejected payout request #{} (amount={} VND, reason={})",
                 adminUsername, payout.getId(), payout.getAmount(), note);

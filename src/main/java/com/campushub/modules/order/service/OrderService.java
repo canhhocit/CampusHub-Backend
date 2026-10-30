@@ -62,6 +62,7 @@ public class OrderService {
     private final com.campushub.modules.audit.service.AuditService auditService;
     private final com.campushub.modules.admin.service.SystemSettingService systemSettingService;
     private final com.campushub.modules.wallet.service.WalletService walletService;
+    private final com.campushub.modules.notification.service.NotificationService notificationService;
 
     // Transient in-memory cache for fast lookup during active session
     private final Map<Long, String> activePickupCodes = new ConcurrentHashMap<>();
@@ -79,7 +80,8 @@ public class OrderService {
                         OrderAttemptService orderAttemptService,
                         com.campushub.modules.audit.service.AuditService auditService,
                         com.campushub.modules.admin.service.SystemSettingService systemSettingService,
-                        com.campushub.modules.wallet.service.WalletService walletService) {
+                        com.campushub.modules.wallet.service.WalletService walletService,
+                        com.campushub.modules.notification.service.NotificationService notificationService) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
@@ -93,6 +95,7 @@ public class OrderService {
         this.auditService = auditService;
         this.systemSettingService = systemSettingService;
         this.walletService = walletService;
+        this.notificationService = notificationService;
     }
 
     private OrderResponse mapToOrderResponse(Order order) {
@@ -402,6 +405,18 @@ public class OrderService {
         order.setCompartment(lockedCompartment);
         order.setStatus(OrderStatus.AWAITING_DEPOSIT);
 
+        notificationService.createNotification(
+                order.getSeller(),
+                "Bạn có đơn hàng mới!",
+                String.format("Người mua %s đã đặt đơn %s cho sản phẩm '%s'.",
+                        order.getBuyer().getFullName() != null ? order.getBuyer().getFullName() : order.getBuyer().getUsername(),
+                        order.getOrderNumber(),
+                        order.getProduct().getTitle()),
+                "ORDER_CREATED",
+                "ORDER",
+                order.getId()
+        );
+
         order = orderRepository.save(order);
         return mapToOrderResponse(order);
     }
@@ -530,6 +545,16 @@ public class OrderService {
         );
         sendEmailAfterCommit(order.getBuyer().getEmail(), subject, text);
 
+        notificationService.createNotification(
+                order.getBuyer(),
+                "Hàng đã được gửi vào tủ!",
+                String.format("Người bán đã gửi đơn hàng %s vào tủ %s (Ngăn %s). Mã nhận hàng của bạn là %s.",
+                        order.getOrderNumber(), locker.getName(), compartment.getCode(), rawPickupCode),
+                "ORDER_DEPOSITED",
+                "ORDER",
+                order.getId()
+        );
+
         return mapToOrderResponse(order);
     }
 
@@ -616,6 +641,15 @@ public class OrderService {
             order.setStatus(OrderStatus.COMPLETED);
             product.setStatus(ProductStatus.SOLD);
             walletService.creditOrderPayout(order);
+            notificationService.createNotification(
+                    order.getSeller(),
+                    "Đơn hàng hoàn tất - Tiền đã vào ví!",
+                    String.format("Người mua đã nhận món hàng '%s' (Đơn %s). Tiền bán hàng đã được cộng vào ví của bạn.",
+                            product.getTitle(), order.getOrderNumber()),
+                    "ORDER_COMPLETED",
+                    "ORDER",
+                    order.getId()
+            );
         }
         productRepository.save(product);
 
@@ -797,6 +831,16 @@ public class OrderService {
                 order.getDepositAmount() != null ? order.getDepositAmount().toString() : "0"
         );
         sendEmailAfterCommit(order.getBuyer().getEmail(), subject, text);
+
+        notificationService.createNotification(
+                order.getBuyer(),
+                "Hoàn tất trả đồ thuê",
+                String.format("Chủ đồ đã nhận lại sản phẩm '%s'. Đơn hàng %s đã hoàn tất và tiền cọc đã được hoàn về ví.",
+                        product.getTitle(), order.getOrderNumber()),
+                "ORDER_COMPLETED",
+                "ORDER",
+                order.getId()
+        );
 
         return mapToOrderResponse(order);
     }

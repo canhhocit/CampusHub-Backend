@@ -70,7 +70,14 @@ public enum ErrorCode {
     INVALID_WITHDRAWAL_AMOUNT(HttpStatus.BAD_REQUEST, "Số tiền rút không hợp lệ (tối thiểu 10,000 VNĐ)"),
     BANK_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy thông tin tài khoản ngân hàng"),
     PAYOUT_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu rút tiền"),
-    PAYOUT_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "Yêu cầu rút tiền này đã được xử lý trước đó");
+    PAYOUT_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "Yêu cầu rút tiền này đã được xử lý trước đó"),
+    ENTITY_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy dữ liệu yêu cầu"),
+    REVIEW_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Đơn hàng này đã được đánh giá"),
+    REVIEW_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Chỉ có thể đánh giá đơn hàng đã hoàn tất"),
+    DISPUTE_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Đơn hàng này đã có khiếu nại đang chờ xử lý"),
+    DISPUTE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Không thể khiếu nại đơn hàng ở trạng thái này"),
+    DISPUTE_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy thông tin khiếu nại"),
+    DISPUTE_ALREADY_RESOLVED(HttpStatus.BAD_REQUEST, "Khiếu nại này đã được giải quyết trước đó");
 
     private final HttpStatus status;
     private final String message;
