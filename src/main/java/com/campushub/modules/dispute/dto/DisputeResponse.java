@@ -29,6 +29,12 @@ public class DisputeResponse {
     private String resolvedByUsername;
     private LocalDateTime resolvedAt;
     private LocalDateTime createdAt;
+    private Long lockerId;
+    private String lockerName;
+    private Long compartmentId;
+    private String compartmentCode;
+    private String compartmentStatus;
+    private Boolean isCompartmentIsolated;
 
     public DisputeResponse() {}
 
@@ -207,5 +213,51 @@ public class DisputeResponse {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
-}
+    public Long getLockerId() {
+        return lockerId;
+    }
 
+    public void setLockerId(Long lockerId) {
+        this.lockerId = lockerId;
+    }
+
+    public String getLockerName() {
+        return lockerName;
+    }
+
+    public void setLockerName(String lockerName) {
+        this.lockerName = lockerName;
+    }
+
+    public Long getCompartmentId() {
+        return compartmentId;
+    }
+
+    public void setCompartmentId(Long compartmentId) {
+        this.compartmentId = compartmentId;
+    }
+
+    public String getCompartmentCode() {
+        return compartmentCode;
+    }
+
+    public void setCompartmentCode(String compartmentCode) {
+        this.compartmentCode = compartmentCode;
+    }
+
+    public String getCompartmentStatus() {
+        return compartmentStatus;
+    }
+
+    public void setCompartmentStatus(String compartmentStatus) {
+        this.compartmentStatus = compartmentStatus;
+    }
+
+    public Boolean getIsCompartmentIsolated() {
+        return isCompartmentIsolated;
+    }
+
+    public void setIsCompartmentIsolated(Boolean isCompartmentIsolated) {
+        this.isCompartmentIsolated = isCompartmentIsolated;
+    }
+}

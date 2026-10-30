@@ -9,3 +9,4 @@ public record UpdateWithdrawalConfigRequest(
         @DecimalMin(value = "1000.00", message = "Hạn mức rút tiền tối thiểu ít nhất là 1.000 VNĐ")
         BigDecimal minWithdrawalAmount
 ) {}
+

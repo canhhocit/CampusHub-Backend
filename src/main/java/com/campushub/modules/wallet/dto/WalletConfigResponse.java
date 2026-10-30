@@ -5,3 +5,4 @@ import java.math.BigDecimal;
 public record WalletConfigResponse(
         BigDecimal minWithdrawalAmount
 ) {}
+

@@ -15,6 +15,9 @@ import com.campushub.modules.order.repository.OrderRepository;
 import com.campushub.modules.user.entity.User;
 import com.campushub.modules.user.repository.UserRepository;
 import com.campushub.modules.wallet.service.WalletService;
+import com.campushub.modules.locker.entity.Compartment;
+import com.campushub.modules.locker.entity.CompartmentStatus;
+import com.campushub.modules.locker.repository.CompartmentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -36,17 +39,20 @@ public class DisputeService {
     private final UserRepository userRepository;
     private final WalletService walletService;
     private final NotificationService notificationService;
+    private final CompartmentRepository compartmentRepository;
 
     public DisputeService(OrderDisputeRepository disputeRepository,
                           OrderRepository orderRepository,
                           UserRepository userRepository,
                           WalletService walletService,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          CompartmentRepository compartmentRepository) {
         this.disputeRepository = disputeRepository;
         this.orderRepository = orderRepository;
         this.userRepository = userRepository;
         this.walletService = walletService;
         this.notificationService = notificationService;
+        this.compartmentRepository = compartmentRepository;
     }
 
     @Transactional
@@ -75,6 +81,18 @@ public class DisputeService {
             dispute.setProofImageUrl(request.getProofImageUrl().trim());
         }
         dispute.setStatus(DisputeStatus.OPEN);
+
+        // Auto-isolate compartment if EMPTY_COMPARTMENT
+        if (request.getReason() == com.campushub.modules.dispute.enums.DisputeReason.EMPTY_COMPARTMENT) {
+            Compartment compToIsolate = order.getReturnCompartment() != null ? order.getReturnCompartment() : order.getCompartment();
+            if (compToIsolate != null) {
+                Compartment comp = compartmentRepository.findByIdWithLock(compToIsolate.getId()).orElse(compToIsolate);
+                comp.setStatus(CompartmentStatus.ERROR);
+                compartmentRepository.save(comp);
+                log.warn("Auto-isolated compartment #{} ({}) due to EMPTY_COMPARTMENT dispute #{} on order #{}",
+                        comp.getId(), comp.getCode(), dispute.getId(), order.getId());
+            }
+        }
 
         dispute = disputeRepository.save(dispute);
         log.info("User {} created dispute #{} for order #{}", buyerUsername, dispute.getId(), order.getId());
@@ -182,6 +200,19 @@ public class DisputeService {
             );
         }
 
+        if (Boolean.TRUE.equals(request.getReleaseCompartment())) {
+            Compartment compToRelease = order.getReturnCompartment() != null ? order.getReturnCompartment() : order.getCompartment();
+            if (compToRelease != null) {
+                Compartment comp = compartmentRepository.findByIdWithLock(compToRelease.getId()).orElse(compToRelease);
+                if (comp.getStatus() == CompartmentStatus.ERROR || comp.getStatus() == CompartmentStatus.OUT_OF_SERVICE) {
+                    comp.setStatus(CompartmentStatus.AVAILABLE);
+                    compartmentRepository.save(comp);
+                    log.info("Admin released isolated compartment #{} ({}) back to AVAILABLE after resolving dispute #{}",
+                            comp.getId(), comp.getCode(), dispute.getId());
+                }
+            }
+        }
+
         dispute = disputeRepository.save(dispute);
         log.info("Admin {} resolved dispute #{} with status {}", adminUsername, dispute.getId(), resolution);
 
@@ -216,6 +247,22 @@ public class DisputeService {
         }
         res.setResolvedAt(d.getResolvedAt());
         res.setCreatedAt(d.getCreatedAt());
+
+        Compartment comp = d.getOrder().getReturnCompartment() != null ? d.getOrder().getReturnCompartment() : d.getOrder().getCompartment();
+        if (comp != null) {
+            res.setCompartmentId(comp.getId());
+            res.setCompartmentCode(comp.getCode());
+            res.setCompartmentStatus(comp.getStatus().name());
+            res.setIsCompartmentIsolated(comp.getStatus() == CompartmentStatus.ERROR || comp.getStatus() == CompartmentStatus.OUT_OF_SERVICE);
+            if (comp.getLocker() != null) {
+                res.setLockerId(comp.getLocker().getId());
+                res.setLockerName(comp.getLocker().getName());
+            }
+        } else if (d.getOrder().getLocker() != null) {
+            res.setLockerId(d.getOrder().getLocker().getId());
+            res.setLockerName(d.getOrder().getLocker().getName());
+        }
+
         return res;
     }
 }
