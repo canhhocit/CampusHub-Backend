@@ -68,7 +68,7 @@ app:
     cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/orders}
     simulation-enabled: ${PAYOS_SIMULATION_ENABLED:true}
   ping:
-    enabled: ${SELF_PING_ENABLED:true}
+    enabled: ${SELF_PING_ENABLED:false}
     url: ${SELF_PING_URL:${RENDER_EXTERNAL_URL:}}
     interval-ms: ${SELF_PING_INTERVAL_MS:300000}
   ocr:
