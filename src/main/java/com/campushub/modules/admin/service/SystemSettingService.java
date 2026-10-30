@@ -23,6 +23,7 @@ public class SystemSettingService {
     public static final String KEY_MAX_PRODUCT_VIDEOS = "MAX_PRODUCT_VIDEOS";
     public static final String KEY_ALLOW_PRODUCT_VIDEO = "ALLOW_PRODUCT_VIDEO";
     public static final String KEY_MAX_VIDEO_SIZE_MB = "MAX_VIDEO_SIZE_MB";
+    public static final String KEY_MIN_WITHDRAWAL_AMOUNT = "MIN_WITHDRAWAL_AMOUNT";
 
     private final SystemSettingRepository systemSettingRepository;
 
@@ -118,6 +119,20 @@ public class SystemSettingService {
             BigDecimal sellerPayout = totalRent.subtract(platformFee);
             return new FeeCalculation(totalAmount, deposit, platformFee, sellerPayout);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getMinWithdrawalAmount() {
+        return new BigDecimal(getSettingValue(KEY_MIN_WITHDRAWAL_AMOUNT, "50000.00"));
+    }
+
+    @Transactional
+    public BigDecimal updateMinWithdrawalAmount(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Hạn mức rút tiền tối thiểu phải lớn hơn 0");
+        }
+        saveSetting(KEY_MIN_WITHDRAWAL_AMOUNT, amount.stripTrailingZeros().toPlainString(), "Hạn mức rút tiền ví tối thiểu (VNĐ)");
+        return getMinWithdrawalAmount();
     }
 
     private String getSettingValue(String key, String defaultValue) {

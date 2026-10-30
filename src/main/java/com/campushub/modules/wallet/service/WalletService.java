@@ -17,6 +17,7 @@ import com.campushub.modules.wallet.repository.PayoutRequestRepository;
 import com.campushub.modules.wallet.repository.UserBankAccountRepository;
 import com.campushub.modules.wallet.repository.WalletRepository;
 import com.campushub.modules.wallet.repository.WalletTransactionRepository;
+import com.campushub.modules.admin.service.SystemSettingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -39,19 +40,27 @@ public class WalletService {
     private final UserBankAccountRepository userBankAccountRepository;
     private final PayoutRequestRepository payoutRequestRepository;
     private final UserRepository userRepository;
+    private final SystemSettingService systemSettingService;
 
     public WalletService(
             WalletRepository walletRepository,
             WalletTransactionRepository walletTransactionRepository,
             UserBankAccountRepository userBankAccountRepository,
             PayoutRequestRepository payoutRequestRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            SystemSettingService systemSettingService
     ) {
         this.walletRepository = walletRepository;
         this.walletTransactionRepository = walletTransactionRepository;
         this.userBankAccountRepository = userBankAccountRepository;
         this.payoutRequestRepository = payoutRequestRepository;
         this.userRepository = userRepository;
+        this.systemSettingService = systemSettingService;
+    }
+
+    @Transactional(readOnly = true)
+    public WalletConfigResponse getWalletConfig() {
+        return new WalletConfigResponse(systemSettingService.getMinWithdrawalAmount());
     }
 
     @Transactional
@@ -215,9 +224,11 @@ public class WalletService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        BigDecimal minWithdrawal = systemSettingService.getMinWithdrawalAmount();
         BigDecimal amount = request.getAmount();
-        if (amount == null || amount.compareTo(MIN_WITHDRAWAL) < 0) {
-            throw new AppException(ErrorCode.INVALID_WITHDRAWAL_AMOUNT);
+        if (amount == null || amount.compareTo(minWithdrawal) < 0) {
+            throw new AppException(ErrorCode.INVALID_WITHDRAWAL_AMOUNT,
+                    String.format("Số tiền rút tối thiểu là %,d VNĐ", minWithdrawal.longValue()));
         }
 
         UserBankAccount bankAccount;

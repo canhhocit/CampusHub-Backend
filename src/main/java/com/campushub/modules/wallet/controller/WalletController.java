@@ -28,6 +28,12 @@ public class WalletController {
         this.walletService = walletService;
     }
 
+    @GetMapping("/config")
+    @Operation(summary = "Xem cấu hình ví (hạn mức rút tối thiểu)")
+    public ResponseEntity<WalletConfigResponse> getWalletConfig() {
+        return ResponseEntity.ok(walletService.getWalletConfig());
+    }
+
     @GetMapping("/me")
     @Operation(summary = "Xem số dư ví của tài khoản hiện tại")
     public ResponseEntity<WalletResponse> getMyWallet(Authentication authentication) {

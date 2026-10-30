@@ -42,6 +42,20 @@ public class AdminController {
         return ResponseEntity.ok(systemSettingService.updateFeeConfig(request));
     }
 
+    @GetMapping("/settings/withdrawal")
+    @Operation(summary = "Get withdrawal settings", description = "Get minimum withdrawal amount configuration")
+    public ResponseEntity<com.campushub.modules.admin.dto.WithdrawalConfigResponse> getWithdrawalConfig() {
+        return ResponseEntity.ok(new com.campushub.modules.admin.dto.WithdrawalConfigResponse(systemSettingService.getMinWithdrawalAmount()));
+    }
+
+    @PutMapping("/settings/withdrawal")
+    @Operation(summary = "Update withdrawal settings", description = "Update minimum withdrawal amount configuration")
+    public ResponseEntity<com.campushub.modules.admin.dto.WithdrawalConfigResponse> updateWithdrawalConfig(
+            @Valid @RequestBody com.campushub.modules.admin.dto.UpdateWithdrawalConfigRequest request) {
+        java.math.BigDecimal updated = systemSettingService.updateMinWithdrawalAmount(request.minWithdrawalAmount());
+        return ResponseEntity.ok(new com.campushub.modules.admin.dto.WithdrawalConfigResponse(updated));
+    }
+
     @GetMapping("/settings/media")
     @Operation(summary = "Get product media settings", description = "Get media limit settings for images and videos")
     public ResponseEntity<com.campushub.modules.admin.dto.ProductMediaSettingsResponse> getMediaConfig() {
