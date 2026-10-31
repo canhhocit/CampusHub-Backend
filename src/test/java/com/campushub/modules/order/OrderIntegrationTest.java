@@ -535,4 +535,49 @@ public class OrderIntegrationTest {
         var sellerDetail = orderService.getOrder(order.getId(), "seller_order_test");
         org.junit.jupiter.api.Assertions.assertNull(sellerDetail.getPickupCode());
     }
+
+    @Test
+    public void testSellerFinancialsHiddenFromBuyer() throws Exception {
+        Order order = new Order();
+        order.setOrderNumber("ORD-PRIVACY-TEST-" + System.currentTimeMillis());
+        order.setProduct(product);
+        order.setBuyer(buyer);
+        order.setSeller(seller);
+        order.setPriceSnapshot(product.getPrice());
+        order.setPlatformFee(new BigDecimal("15000.00"));
+        order.setSellerPayout(new BigDecimal("135000.00"));
+        order.setStatus(OrderStatus.PENDING_SELLER);
+        final Order savedOrder = orderRepository.saveAndFlush(order);
+        final Long targetOrderId = savedOrder.getId();
+
+        // Buyer views order detail: platformFee and sellerPayout MUST be null
+        var buyerDetail = orderService.getOrder(targetOrderId, "buyer_order_test");
+        org.junit.jupiter.api.Assertions.assertNull(buyerDetail.getPlatformFee(), "Buyer must NOT see platform fee");
+        org.junit.jupiter.api.Assertions.assertNull(buyerDetail.getSellerPayout(), "Buyer must NOT see seller payout");
+
+        // Seller views order detail: platformFee and sellerPayout MUST be present
+        var sellerDetail = orderService.getOrder(targetOrderId, "seller_order_test");
+        org.junit.jupiter.api.Assertions.assertNotNull(sellerDetail.getPlatformFee(), "Seller must see platform fee");
+        org.junit.jupiter.api.Assertions.assertNotNull(sellerDetail.getSellerPayout(), "Seller must see seller payout");
+        assertEquals(new BigDecimal("15000.00"), sellerDetail.getPlatformFee());
+        assertEquals(new BigDecimal("135000.00"), sellerDetail.getSellerPayout());
+
+        // Buyer queries buying orders: items must NOT have platformFee or sellerPayout
+        var buyingOrders = orderService.getBuyingOrders("buyer_order_test", org.springframework.data.domain.PageRequest.of(0, 10));
+        var buyerOrderRes = buyingOrders.getContent().stream()
+                .filter(o -> o.getId().equals(targetOrderId))
+                .findFirst()
+                .orElseThrow();
+        org.junit.jupiter.api.Assertions.assertNull(buyerOrderRes.getPlatformFee(), "Buying list must NOT leak platform fee");
+        org.junit.jupiter.api.Assertions.assertNull(buyerOrderRes.getSellerPayout(), "Buying list must NOT leak seller payout");
+
+        // Seller queries selling orders: items MUST have platformFee and sellerPayout
+        var sellingOrders = orderService.getSellingOrders("seller_order_test", org.springframework.data.domain.PageRequest.of(0, 10));
+        var sellerOrderRes = sellingOrders.getContent().stream()
+                .filter(o -> o.getId().equals(targetOrderId))
+                .findFirst()
+                .orElseThrow();
+        org.junit.jupiter.api.Assertions.assertNotNull(sellerOrderRes.getPlatformFee(), "Selling list must have platform fee");
+        org.junit.jupiter.api.Assertions.assertNotNull(sellerOrderRes.getSellerPayout(), "Selling list must have seller payout");
+    }
 }

@@ -98,7 +98,27 @@ public class OrderService {
         this.notificationService = notificationService;
     }
 
+    private boolean isSellerOrAdmin(Order order, String username) {
+        if (username == null) {
+            return false;
+        }
+        if (order.getSeller() != null && username.equals(order.getSeller().getUsername())) {
+            return true;
+        }
+        return userRepository.findByUsername(username)
+                .map(u -> u.getRole() == Role.ADMIN)
+                .orElse(false);
+    }
+
     private OrderResponse mapToOrderResponse(Order order) {
+        return mapToOrderResponse(order, null, true);
+    }
+
+    private OrderResponse mapToOrderResponse(Order order, String username) {
+        return mapToOrderResponse(order, username, false);
+    }
+
+    private OrderResponse mapToOrderResponse(Order order, String username, boolean defaultPrivileged) {
         OrderResponse res = new OrderResponse();
         res.setId(order.getId());
         res.setOrderNumber(order.getOrderNumber());
@@ -141,8 +161,16 @@ public class OrderService {
         res.setRentalDurationDays(order.getRentalDurationDays());
         res.setDueReturnAt(order.getDueReturnAt());
         res.setDepositAmount(order.getDepositAmount());
-        res.setPlatformFee(order.getPlatformFee());
-        res.setSellerPayout(order.getSellerPayout());
+
+        boolean isPrivileged = defaultPrivileged || isSellerOrAdmin(order, username);
+        if (isPrivileged) {
+            res.setPlatformFee(order.getPlatformFee());
+            res.setSellerPayout(order.getSellerPayout());
+        } else {
+            res.setPlatformFee(null);
+            res.setSellerPayout(null);
+        }
+
         java.math.BigDecimal total1 = (order.getPriceSnapshot() != null ? order.getPriceSnapshot() : java.math.BigDecimal.ZERO)
                 .add(order.getDepositAmount() != null ? order.getDepositAmount() : java.math.BigDecimal.ZERO);
         res.setTotalAmount(total1);
@@ -172,8 +200,16 @@ public class OrderService {
         res.setRentalDurationDays(order.getRentalDurationDays());
         res.setDueReturnAt(order.getDueReturnAt());
         res.setDepositAmount(order.getDepositAmount());
-        res.setPlatformFee(order.getPlatformFee());
-        res.setSellerPayout(order.getSellerPayout());
+
+        boolean isPrivileged = isSellerOrAdmin(order, username);
+        if (isPrivileged) {
+            res.setPlatformFee(order.getPlatformFee());
+            res.setSellerPayout(order.getSellerPayout());
+        } else {
+            res.setPlatformFee(null);
+            res.setSellerPayout(null);
+        }
+
         java.math.BigDecimal total2 = (order.getPriceSnapshot() != null ? order.getPriceSnapshot() : java.math.BigDecimal.ZERO)
                 .add(order.getDepositAmount() != null ? order.getDepositAmount() : java.math.BigDecimal.ZERO);
         res.setTotalAmount(total2);
@@ -313,7 +349,7 @@ public class OrderService {
         }
 
         order = orderRepository.save(order);
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, buyerUsername);
     }
 
     @Transactional(readOnly = true)
@@ -321,7 +357,7 @@ public class OrderService {
         User buyer = userRepository.findByUsername(buyerUsername)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         return orderRepository.findByBuyerId(buyer.getId(), pageable)
-                .map(this::mapToOrderResponse);
+                .map(o -> mapToOrderResponse(o, buyerUsername));
     }
 
     @Transactional(readOnly = true)
@@ -329,7 +365,7 @@ public class OrderService {
         User seller = userRepository.findByUsername(sellerUsername)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         return orderRepository.findBySellerId(seller.getId(), pageable)
-                .map(this::mapToOrderResponse);
+                .map(o -> mapToOrderResponse(o, sellerUsername));
     }
 
     @Transactional(readOnly = true)
@@ -418,7 +454,7 @@ public class OrderService {
         );
 
         order = orderRepository.save(order);
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, sellerUsername);
     }
 
     @Transactional
@@ -445,7 +481,7 @@ public class OrderService {
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
             walletService.refundOrderPayment(order, "Hoàn tiền do người bán từ chối đơn hàng");
         }
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, sellerUsername);
     }
 
     @Transactional
@@ -470,7 +506,7 @@ public class OrderService {
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
             walletService.refundOrderPayment(order, "Hoàn tiền do người mua hủy đơn hàng");
         }
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, buyerUsername);
     }
 
     @Transactional
@@ -555,7 +591,7 @@ public class OrderService {
                 order.getId()
         );
 
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, sellerUsername);
     }
 
     @Transactional(noRollbackFor = PickupValidationException.class)
@@ -657,7 +693,7 @@ public class OrderService {
         activePickupCodes.remove(order.getId());
 
         order = orderRepository.save(order);
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, buyerUsername);
     }
 
     @Transactional
@@ -703,7 +739,7 @@ public class OrderService {
         order.setStatus(OrderStatus.AWAITING_RETURN_DEPOSIT);
 
         order = orderRepository.save(order);
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, buyerUsername);
     }
 
     @Transactional
@@ -767,7 +803,7 @@ public class OrderService {
         );
         sendEmailAfterCommit(order.getSeller().getEmail(), subject, text);
 
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, buyerUsername);
     }
 
     @Transactional(noRollbackFor = PickupValidationException.class)
@@ -842,7 +878,7 @@ public class OrderService {
                 order.getId()
         );
 
-        return mapToOrderResponse(order);
+        return mapToOrderResponse(order, sellerUsername);
     }
 
     @Transactional
