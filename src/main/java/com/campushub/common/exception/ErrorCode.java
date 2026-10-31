@@ -77,7 +77,10 @@ public enum ErrorCode {
     DISPUTE_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Đơn hàng này đã có khiếu nại đang chờ xử lý"),
     DISPUTE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Không thể khiếu nại đơn hàng ở trạng thái này"),
     DISPUTE_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy thông tin khiếu nại"),
-    DISPUTE_ALREADY_RESOLVED(HttpStatus.BAD_REQUEST, "Khiếu nại này đã được giải quyết trước đó");
+    DISPUTE_ALREADY_RESOLVED(HttpStatus.BAD_REQUEST, "Khiếu nại này đã được giải quyết trước đó"),
+    TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "Phiên đăng nhập đã kết thúc hoặc token đã bị thu hồi. Vui lòng đăng nhập lại."),
+    IDEMPOTENT_OPERATION_IN_PROGRESS(HttpStatus.CONFLICT, "Giao dịch đang được xử lý, vui lòng không gửi lại yêu cầu."),
+    KIOSK_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Bạn đã nhập sai mã PIN quá nhiều lần. Trạm tủ tạm thời bị khóa thử lại để bảo vệ tài sản.");
 
     private final HttpStatus status;
     private final String message;

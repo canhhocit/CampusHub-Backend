@@ -1,9 +1,10 @@
 package com.campushub.modules.locker.dto;
 
 import com.campushub.modules.locker.entity.LockerStatus;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
-public class LockerResponse {
+public class LockerResponse implements Serializable {
     private Long id;
     private String code;
     private String name;

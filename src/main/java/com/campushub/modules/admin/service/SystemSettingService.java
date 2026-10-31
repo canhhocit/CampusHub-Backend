@@ -8,6 +8,8 @@ import com.campushub.modules.admin.repository.SystemSettingRepository;
 import com.campushub.modules.order.entity.OrderType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -32,6 +34,7 @@ public class SystemSettingService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "system_settings", key = "'fee_config'")
     public FeeConfigResponse getFeeConfig() {
         BigDecimal salePercent = new BigDecimal(getSettingValue(KEY_SALE_COMMISSION_PERCENT, "5.0"));
         String rentalModeStr = getSettingValue(KEY_RENTAL_FEE_MODE, "PERCENT");
@@ -42,6 +45,7 @@ public class SystemSettingService {
     }
 
     @Transactional
+    @CacheEvict(value = "system_settings", allEntries = true)
     public FeeConfigResponse updateFeeConfig(UpdateFeeConfigRequest request) {
         saveSetting(KEY_SALE_COMMISSION_PERCENT, request.getSaleCommissionPercent().stripTrailingZeros().toPlainString(), "Phần trăm hoa hồng đơn bán (%)");
         saveSetting(KEY_RENTAL_FEE_MODE, request.getRentalFeeMode().name(), "Cách tính phí thuê (PERCENT hoặc PER_DAY)");
@@ -51,6 +55,7 @@ public class SystemSettingService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "system_settings", key = "'media_config'")
     public com.campushub.modules.admin.dto.ProductMediaSettingsResponse getMediaConfig() {
         int maxImages = Integer.parseInt(getSettingValue(KEY_MAX_PRODUCT_IMAGES, "5"));
         int maxVideos = Integer.parseInt(getSettingValue(KEY_MAX_PRODUCT_VIDEOS, "1"));
@@ -61,6 +66,7 @@ public class SystemSettingService {
     }
 
     @Transactional
+    @CacheEvict(value = "system_settings", allEntries = true)
     public com.campushub.modules.admin.dto.ProductMediaSettingsResponse updateMediaConfig(com.campushub.modules.admin.dto.UpdateProductMediaSettingsRequest request) {
         saveSetting(KEY_MAX_PRODUCT_IMAGES, String.valueOf(request.getMaxProductImages()), "Số lượng ảnh mô tả tối đa cho mỗi sản phẩm");
         saveSetting(KEY_MAX_PRODUCT_VIDEOS, String.valueOf(request.getMaxProductVideos()), "Số lượng video tối đa cho mỗi sản phẩm");
@@ -122,11 +128,13 @@ public class SystemSettingService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "system_settings", key = "'min_withdrawal'")
     public BigDecimal getMinWithdrawalAmount() {
         return new BigDecimal(getSettingValue(KEY_MIN_WITHDRAWAL_AMOUNT, "50000.00"));
     }
 
     @Transactional
+    @CacheEvict(value = "system_settings", allEntries = true)
     public BigDecimal updateMinWithdrawalAmount(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Hạn mức rút tiền tối thiểu phải lớn hơn 0");

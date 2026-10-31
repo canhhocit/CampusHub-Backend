@@ -49,6 +49,7 @@ public class KioskService {
     private final WalletService walletService;
     private final NotificationService notificationService;
     private final AuditService auditService;
+    private final KioskRateLimitService kioskRateLimitService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public KioskService(LockerRepository lockerRepository,
@@ -60,7 +61,8 @@ public class KioskService {
                         AesEncryptionService aesEncryptionService,
                         WalletService walletService,
                         NotificationService notificationService,
-                        AuditService auditService) {
+                        AuditService auditService,
+                        KioskRateLimitService kioskRateLimitService) {
         this.lockerRepository = lockerRepository;
         this.compartmentRepository = compartmentRepository;
         this.orderRepository = orderRepository;
@@ -71,10 +73,19 @@ public class KioskService {
         this.walletService = walletService;
         this.notificationService = notificationService;
         this.auditService = auditService;
+        this.kioskRateLimitService = kioskRateLimitService;
     }
 
     @Transactional
     public KioskActionResponse processPickupByPin(Long lockerId, KioskPickupRequest request) {
+        return processPickupByPin(lockerId, request, null);
+    }
+
+    @Transactional
+    public KioskActionResponse processPickupByPin(Long lockerId, KioskPickupRequest request, String clientIp) {
+        // Enforce Kiosk Brute-Force Rate Limiting
+        kioskRateLimitService.checkRateLimit(lockerId, clientIp);
+
         Locker locker = lockerRepository.findById(lockerId)
                 .orElseThrow(() -> new AppException(ErrorCode.LOCKER_NOT_FOUND));
 
@@ -106,11 +117,15 @@ public class KioskService {
         }
 
         if (matchedOrder == null) {
+            kioskRateLimitService.recordFailedAttempt(lockerId, clientIp);
             log.warn("Kiosk PIN validation failed at locker #{} for pin: {}", lockerId, pinCode);
             auditService.log(AuditAction.ORDER_PICKUP_FAILED, AuditEntityType.LOCKER, lockerId,
                     "Kiosk PIN validation failed", false, ErrorCode.INVALID_PICKUP_CODE.name());
             throw new AppException(ErrorCode.INVALID_PICKUP_CODE, "Mã PIN không đúng hoặc đơn hàng không thuộc tủ này");
         }
+
+        // Reset rate limit counter on success
+        kioskRateLimitService.resetFailedAttempts(lockerId, clientIp);
 
         Compartment compartment = isReturnPickup ? matchedOrder.getReturnCompartment() : matchedOrder.getCompartment();
         if (compartment == null) {

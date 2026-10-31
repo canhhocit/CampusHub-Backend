@@ -1,6 +1,14 @@
 spring:
   application:
     name: CampusHub
+  data:
+    redis:
+      repositories:
+        enabled: false
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT_MS:2000}
   servlet:
     multipart:
       max-file-size: 100MB
@@ -79,6 +87,11 @@ app:
     max-daily-attempts: ${IDENTITY_MAX_DAILY_ATTEMPTS:5}
     attempt-ttl-minutes: ${IDENTITY_ATTEMPT_TTL_MINUTES:15}
     max-steps-per-attempt: ${IDENTITY_MAX_STEPS_PER_ATTEMPT:10}
+  redis:
+    enabled: ${REDIS_ENABLED:true}
+  kiosk:
+    max-failed-attempts: ${KIOSK_MAX_FAILED_ATTEMPTS:5}
+    lockout-duration-minutes: ${KIOSK_LOCKOUT_MINUTES:10}
 
 
 

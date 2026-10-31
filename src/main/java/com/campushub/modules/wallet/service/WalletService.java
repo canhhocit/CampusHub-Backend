@@ -41,6 +41,7 @@ public class WalletService {
     private final PayoutRequestRepository payoutRequestRepository;
     private final UserRepository userRepository;
     private final SystemSettingService systemSettingService;
+    private final com.campushub.infrastructure.idempotency.IdempotencyService idempotencyService;
 
     public WalletService(
             WalletRepository walletRepository,
@@ -48,7 +49,8 @@ public class WalletService {
             UserBankAccountRepository userBankAccountRepository,
             PayoutRequestRepository payoutRequestRepository,
             UserRepository userRepository,
-            SystemSettingService systemSettingService
+            SystemSettingService systemSettingService,
+            com.campushub.infrastructure.idempotency.IdempotencyService idempotencyService
     ) {
         this.walletRepository = walletRepository;
         this.walletTransactionRepository = walletTransactionRepository;
@@ -56,6 +58,7 @@ public class WalletService {
         this.payoutRequestRepository = payoutRequestRepository;
         this.userRepository = userRepository;
         this.systemSettingService = systemSettingService;
+        this.idempotencyService = idempotencyService;
     }
 
     @Transactional(readOnly = true)
@@ -224,6 +227,18 @@ public class WalletService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        // Idempotency check: prevent duplicate concurrent withdrawal submission (double-click protection)
+        String idempotencyKey = "withdraw:user:" + user.getId();
+        idempotencyService.acquireOrThrow(idempotencyKey, java.time.Duration.ofSeconds(10));
+
+        try {
+            return doRequestWithdrawal(user, username, request);
+        } finally {
+            idempotencyService.release(idempotencyKey);
+        }
+    }
+
+    private PayoutRequestResponse doRequestWithdrawal(User user, String username, WithdrawalRequestDto request) {
         BigDecimal minWithdrawal = systemSettingService.getMinWithdrawalAmount();
         BigDecimal amount = request.getAmount();
         if (amount == null || amount.compareTo(minWithdrawal) < 0) {

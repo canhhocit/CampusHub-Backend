@@ -28,10 +28,14 @@ public class PaymentService {
 
     private final OrderRepository orderRepository;
     private final PayOSService payOSService;
+    private final com.campushub.infrastructure.idempotency.IdempotencyService idempotencyService;
 
-    public PaymentService(OrderRepository orderRepository, PayOSService payOSService) {
+    public PaymentService(OrderRepository orderRepository,
+                          PayOSService payOSService,
+                          com.campushub.infrastructure.idempotency.IdempotencyService idempotencyService) {
         this.orderRepository = orderRepository;
         this.payOSService = payOSService;
+        this.idempotencyService = idempotencyService;
     }
 
     @Transactional
@@ -152,52 +156,66 @@ public class PaymentService {
             throw new AppException(ErrorCode.INVALID_ORDER_STATUS, "Thiếu orderCode trong dữ liệu webhook PayOS");
         }
 
-        Order order = orderRepository.findByPayosOrderCodeWithLock(orderCode)
-                .orElseThrow(() -> {
-                    log.warn("PayOS webhook orderCode không tồn tại trong hệ thống: {}", orderCode);
-                    return new AppException(ErrorCode.ORDER_NOT_FOUND, "Không tìm thấy đơn hàng với mã PayOS: " + orderCode);
-                });
-
-        // 4. Xử lý webhook trùng lặp an toàn (Idempotent)
-        if (order.getPaymentStatus() == PaymentStatus.PAID) {
-            log.info("PayOS webhook duplicate notification for already paid order #{} (orderCode={})", order.getId(), orderCode);
+        // Idempotency lock via Redis: prevent duplicate concurrent processing of the same webhook event
+        String idempotencyKey = "payos:webhook:" + orderCode;
+        if (!idempotencyService.tryAcquire(idempotencyKey, java.time.Duration.ofMinutes(5))) {
+            log.info("PayOS webhook for orderCode {} is already being processed or completed.", orderCode);
             return Map.of("code", "00", "desc", "success");
         }
 
-        // 5. Đối soát số tiền thanh toán nhận được so với số tiền của đơn hàng
-        Long receivedAmount = webhookData.getAmount();
-        if (receivedAmount == null) {
-            throw new AppException(ErrorCode.INVALID_PAYMENT_AMOUNT, "Thiếu số tiền trong dữ liệu thanh toán PayOS");
+        try {
+            Order order = orderRepository.findByPayosOrderCodeWithLock(orderCode)
+                    .orElseThrow(() -> {
+                        log.warn("PayOS webhook orderCode không tồn tại trong hệ thống: {}", orderCode);
+                        return new AppException(ErrorCode.ORDER_NOT_FOUND, "Không tìm thấy đơn hàng với mã PayOS: " + orderCode);
+                    });
+
+            // 4. Xử lý webhook trùng lặp an toàn (Idempotent)
+            if (order.getPaymentStatus() == PaymentStatus.PAID) {
+                log.info("PayOS webhook duplicate notification for already paid order #{} (orderCode={})", order.getId(), orderCode);
+                idempotencyService.markCompleted(idempotencyKey, java.time.Duration.ofMinutes(10));
+                return Map.of("code", "00", "desc", "success");
+            }
+
+            // 5. Đối soát số tiền thanh toán nhận được so với số tiền của đơn hàng
+            Long receivedAmount = webhookData.getAmount();
+            if (receivedAmount == null) {
+                throw new AppException(ErrorCode.INVALID_PAYMENT_AMOUNT, "Thiếu số tiền trong dữ liệu thanh toán PayOS");
+            }
+
+            BigDecimal expectedAmount = order.getTotalAmount();
+            if (expectedAmount.compareTo(BigDecimal.valueOf(receivedAmount)) != 0) {
+                log.error("PayOS webhook amount mismatch for order #{}: expected={}, received={}",
+                        order.getId(), expectedAmount, receivedAmount);
+                throw new AppException(ErrorCode.INVALID_PAYMENT_AMOUNT,
+                        "Số tiền thanh toán (" + receivedAmount + " VNĐ) không khớp với giá trị đơn hàng (" + expectedAmount + " VNĐ)");
+            }
+
+            // 6. Kiểm tra trạng thái đơn hàng có hợp lệ để nhận thanh toán
+            if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.REJECTED
+                    || order.getStatus() == OrderStatus.EXPIRED) {
+                log.error("PayOS webhook received for order #{} in invalid status: {}", order.getId(), order.getStatus());
+                throw new AppException(ErrorCode.INVALID_ORDER_STATUS, "Đơn hàng đã bị hủy hoặc hết hạn, không thể nhận thanh toán");
+            }
+
+            // 7. Cập nhật trạng thái thanh toán đơn hàng
+            order.setPaymentStatus(PaymentStatus.PAID);
+            order.setPaymentMethod(PaymentMethod.PAYOS);
+            order.setPaymentPaidAt(LocalDateTime.now());
+            if (webhookData.getReference() != null && !webhookData.getReference().isBlank()) {
+                order.setPayosTransactionReference(webhookData.getReference());
+            }
+            orderRepository.save(order);
+
+            log.info("Xác nhận thanh toán PayOS thành công cho đơn #{} (orderCode={}, amount={}, ref={}) qua Webhook",
+                    order.getId(), orderCode, receivedAmount, webhookData.getReference());
+
+            idempotencyService.markCompleted(idempotencyKey, java.time.Duration.ofMinutes(10));
+            return Map.of("code", "00", "desc", "success");
+        } catch (Exception e) {
+            idempotencyService.release(idempotencyKey);
+            throw e;
         }
-
-        BigDecimal expectedAmount = order.getTotalAmount();
-        if (expectedAmount.compareTo(BigDecimal.valueOf(receivedAmount)) != 0) {
-            log.error("PayOS webhook amount mismatch for order #{}: expected={}, received={}",
-                    order.getId(), expectedAmount, receivedAmount);
-            throw new AppException(ErrorCode.INVALID_PAYMENT_AMOUNT,
-                    "Số tiền thanh toán (" + receivedAmount + " VNĐ) không khớp với giá trị đơn hàng (" + expectedAmount + " VNĐ)");
-        }
-
-        // 6. Kiểm tra trạng thái đơn hàng có hợp lệ để nhận thanh toán
-        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.REJECTED
-                || order.getStatus() == OrderStatus.EXPIRED) {
-            log.error("PayOS webhook received for order #{} in invalid status: {}", order.getId(), order.getStatus());
-            throw new AppException(ErrorCode.INVALID_ORDER_STATUS, "Đơn hàng đã bị hủy hoặc hết hạn, không thể nhận thanh toán");
-        }
-
-        // 7. Cập nhật trạng thái thanh toán đơn hàng
-        order.setPaymentStatus(PaymentStatus.PAID);
-        order.setPaymentMethod(PaymentMethod.PAYOS);
-        order.setPaymentPaidAt(LocalDateTime.now());
-        if (webhookData.getReference() != null && !webhookData.getReference().isBlank()) {
-            order.setPayosTransactionReference(webhookData.getReference());
-        }
-        orderRepository.save(order);
-
-        log.info("Xác nhận thanh toán PayOS thành công cho đơn #{} (orderCode={}, amount={}, ref={}) qua Webhook",
-                order.getId(), orderCode, receivedAmount, webhookData.getReference());
-
-        return Map.of("code", "00", "desc", "success");
     }
 
     @Transactional

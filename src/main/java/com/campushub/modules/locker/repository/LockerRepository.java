@@ -20,6 +20,8 @@ public interface LockerRepository extends JpaRepository<Locker, Long> {
 
     Optional<Locker> findByCode(String code);
 
+    java.util.List<Locker> findByStatus(LockerStatus status);
+
     @Query("SELECT l FROM Locker l WHERE " +
            "(:status IS NULL OR l.status = :status) AND " +
            "(CAST(:search AS string) IS NULL OR " +

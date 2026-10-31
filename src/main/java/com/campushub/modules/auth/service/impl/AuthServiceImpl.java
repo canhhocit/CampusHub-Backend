@@ -46,6 +46,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final CacheManager cacheManager;
     private final com.campushub.modules.audit.service.AuditService auditService;
+    private final com.campushub.common.security.TokenBlacklistService tokenBlacklistService;
 
     @Value("${app.jwt.refresh-expiration}")
     private long refreshExpirationMs;
@@ -63,7 +64,8 @@ public class AuthServiceImpl implements AuthService {
                            JwtProvider jwtProvider,
                            EmailService emailService,
                            CacheManager cacheManager,
-                           com.campushub.modules.audit.service.AuditService auditService) {
+                           com.campushub.modules.audit.service.AuditService auditService,
+                           com.campushub.common.security.TokenBlacklistService tokenBlacklistService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.verificationTokenRepository = verificationTokenRepository;
@@ -72,6 +74,7 @@ public class AuthServiceImpl implements AuthService {
         this.emailService = emailService;
         this.cacheManager = cacheManager;
         this.auditService = auditService;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     private void checkRateLimit(String cacheName, String key, int maxRequests) {
@@ -271,6 +274,14 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void logout(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        // 1. Blacklist Access Token in Redis/In-memory store
+        String authHeader = httpRequest.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String accessToken = authHeader.substring(7);
+            tokenBlacklistService.blacklistToken(accessToken);
+        }
+
+        // 2. Revoke Refresh Token
         String token = getRefreshTokenFromCookies(httpRequest);
         if (token != null) {
             String hashed = hashToken(token);

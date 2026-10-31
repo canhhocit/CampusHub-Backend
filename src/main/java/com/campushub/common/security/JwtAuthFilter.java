@@ -19,10 +19,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
     private final UserDetailsServiceImpl userDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
 
-    public JwtAuthFilter(JwtProvider jwtProvider, UserDetailsServiceImpl userDetailsService) {
+    public JwtAuthFilter(JwtProvider jwtProvider,
+                         UserDetailsServiceImpl userDetailsService,
+                         TokenBlacklistService tokenBlacklistService) {
         this.jwtProvider = jwtProvider;
         this.userDetailsService = userDetailsService;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @Override
@@ -31,6 +35,25 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         try {
             String jwt = parseJwt(request);
             if (jwt != null && jwtProvider.validateJwtToken(jwt)) {
+                // Check if token has been revoked via logout or administrative action
+                if (tokenBlacklistService.isTokenBlacklisted(jwt)) {
+                    SecurityContextHolder.clearContext();
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"error\":\"TOKEN_REVOKED\",\"message\":\"Phiên đăng nhập đã kết thúc hoặc token đã bị thu hồi. Vui lòng đăng nhập lại.\"}");
+                    return;
+                }
+
+                Long userId = jwtProvider.getUserIdFromToken(jwt);
+                java.util.Date issuedAt = jwtProvider.getIssuedAtDateFromToken(jwt);
+                if (tokenBlacklistService.isUserRevoked(userId, issuedAt)) {
+                    SecurityContextHolder.clearContext();
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"error\":\"TOKEN_REVOKED\",\"message\":\"Phiên làm việc đã bị hủy. Vui lòng đăng nhập lại.\"}");
+                    return;
+                }
+
                 String username = jwtProvider.getUsernameFromJwtToken(jwt);
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);

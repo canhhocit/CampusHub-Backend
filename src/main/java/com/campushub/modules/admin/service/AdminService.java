@@ -34,6 +34,7 @@ public class AdminService {
     private final LockerRepository lockerRepository;
     private final CompartmentRepository compartmentRepository;
     private final AuditService auditService;
+    private final com.campushub.common.security.TokenBlacklistService tokenBlacklistService;
 
     public AdminService(
             UserRepository userRepository,
@@ -41,13 +42,15 @@ public class AdminService {
             OrderRepository orderRepository,
             LockerRepository lockerRepository,
             CompartmentRepository compartmentRepository,
-            AuditService auditService) {
+            AuditService auditService,
+            com.campushub.common.security.TokenBlacklistService tokenBlacklistService) {
         this.userRepository = userRepository;
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
         this.lockerRepository = lockerRepository;
         this.compartmentRepository = compartmentRepository;
         this.auditService = auditService;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @Transactional(readOnly = true)
@@ -192,6 +195,10 @@ public class AdminService {
         UserStatus oldStatus = user.getStatus();
         user.setStatus(newStatus);
         user = userRepository.save(user);
+
+        if (newStatus == UserStatus.LOCKED) {
+            tokenBlacklistService.blacklistUser(userId, java.time.Duration.ofDays(7));
+        }
 
         String details = String.format("Changed user status from %s to %s. Reason: %s", 
                 oldStatus, newStatus, reason != null ? reason : "No reason provided");

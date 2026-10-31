@@ -14,6 +14,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -85,6 +87,7 @@ public class MarketplaceService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "categories", key = "'active'")
     public List<CategoryResponse> getActiveCategories() {
         return categoryRepository.findByIsActiveTrueOrderByNameAsc()
                 .stream().map(this::mapCategory).collect(Collectors.toList());
@@ -98,6 +101,7 @@ public class MarketplaceService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse createCategory(com.campushub.modules.marketplace.dto.CategoryCreateRequest request) {
         String slug = request.getSlug().trim().toLowerCase().replaceAll("[^a-z0-9-]", "-");
         Category category = new Category();
@@ -108,6 +112,7 @@ public class MarketplaceService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse updateCategory(Long id, com.campushub.modules.marketplace.dto.CategoryUpdateRequest request) {
         Category category = categoryRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
@@ -116,6 +121,7 @@ public class MarketplaceService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse toggleCategory(Long id) {
         Category category = categoryRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));

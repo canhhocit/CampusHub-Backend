@@ -13,6 +13,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -59,6 +61,14 @@ public class LockerService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "lockers", key = "'active_all'")
+    public List<LockerResponse> getActiveLockers() {
+        return lockerRepository.findByStatus(LockerStatus.ACTIVE).stream()
+                .map(this::mapLocker)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public Page<LockerResponse> getLockers(LockerStatus status, String search, Pageable pageable) {
         String searchPattern = (search == null || search.trim().isEmpty()) ? null : "%" + search.trim().toLowerCase() + "%";
         return lockerRepository.findAllWithFilters(status, searchPattern, pageable)
@@ -98,6 +108,7 @@ public class LockerService {
     }
 
     @Transactional
+    @CacheEvict(value = "lockers", allEntries = true)
     public LockerResponse createLocker(LockerCreateRequest request) {
         String code = request.getCode().trim().toUpperCase();
         if (lockerRepository.existsByCode(code)) {
@@ -115,6 +126,7 @@ public class LockerService {
     }
 
     @Transactional
+    @CacheEvict(value = "lockers", allEntries = true)
     public LockerResponse updateLocker(Long id, LockerUpdateRequest request) {
         Locker locker = lockerRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new AppException(ErrorCode.LOCKER_NOT_FOUND));
@@ -127,6 +139,7 @@ public class LockerService {
     }
 
     @Transactional
+    @CacheEvict(value = "lockers", allEntries = true)
     public LockerResponse updateLockerStatus(Long id, LockerStatusUpdateRequest request) {
         Locker locker = lockerRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new AppException(ErrorCode.LOCKER_NOT_FOUND));
@@ -196,6 +209,7 @@ public class LockerService {
     }
 
     @Transactional
+    @CacheEvict(value = "lockers", allEntries = true)
     public CompartmentResponse createCompartment(Long lockerId, CompartmentCreateRequest request) {
         Locker locker = lockerRepository.findById(lockerId)
                 .orElseThrow(() -> new AppException(ErrorCode.LOCKER_NOT_FOUND));
@@ -215,6 +229,7 @@ public class LockerService {
     }
 
     @Transactional
+    @CacheEvict(value = "lockers", allEntries = true)
     public CompartmentResponse updateCompartmentStatus(Long lockerId, Long compartmentId, CompartmentStatusUpdateRequest request) {
         if (!lockerRepository.existsById(lockerId)) {
             throw new AppException(ErrorCode.LOCKER_NOT_FOUND);

@@ -51,9 +51,20 @@ public class KioskController {
     @Operation(summary = "Nhập mã PIN 6 số tại màn hình Kiosk để mở ngăn nhận đồ")
     public ResponseEntity<KioskActionResponse> pickupByPin(
             @PathVariable Long lockerId,
-            @Valid @RequestBody KioskPickupRequest request
+            @Valid @RequestBody KioskPickupRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest
     ) {
-        return ResponseEntity.ok(kioskService.processPickupByPin(lockerId, request));
+        String clientIp = extractClientIp(httpRequest);
+        return ResponseEntity.ok(kioskService.processPickupByPin(lockerId, request, clientIp));
+    }
+
+    private String extractClientIp(jakarta.servlet.http.HttpServletRequest request) {
+        if (request == null) return null;
+        String xf = request.getHeader("X-Forwarded-For");
+        if (xf != null && !xf.isBlank()) {
+            return xf.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 
     @PostMapping("/lockers/{lockerId}/deposit")

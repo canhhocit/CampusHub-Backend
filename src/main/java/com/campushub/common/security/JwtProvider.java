@@ -70,12 +70,32 @@ public class JwtProvider {
     }
 
     public String getUsernameFromJwtToken(String token) {
+        return getClaimsFromToken(token).getSubject();
+    }
+
+    public Claims getClaimsFromToken(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+                .getPayload();
+    }
+
+    public Date getExpirationDateFromToken(String token) {
+        return getClaimsFromToken(token).getExpiration();
+    }
+
+    public Date getIssuedAtDateFromToken(String token) {
+        return getClaimsFromToken(token).getIssuedAt();
+    }
+
+    public Long getUserIdFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        Object id = claims.get("id");
+        if (id instanceof Number num) {
+            return num.longValue();
+        }
+        return null;
     }
 
     public boolean validateJwtToken(String authToken) {
