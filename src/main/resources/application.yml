@@ -7,8 +7,11 @@ spring:
         enabled: false
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:default}
       password: ${REDIS_PASSWORD:}
-      timeout: ${REDIS_TIMEOUT_MS:2000}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+      timeout: ${REDIS_TIMEOUT_MS:5000}
   servlet:
     multipart:
       max-file-size: 100MB
