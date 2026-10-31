@@ -580,4 +580,25 @@ public class OrderIntegrationTest {
         org.junit.jupiter.api.Assertions.assertNotNull(sellerOrderRes.getPlatformFee(), "Selling list must have platform fee");
         org.junit.jupiter.api.Assertions.assertNotNull(sellerOrderRes.getSellerPayout(), "Selling list must have seller payout");
     }
+
+    @Test
+    @WithMockUser(username = "seller_order_test")
+    public void testPendingSellingOrdersCount() throws Exception {
+        long initialCount = orderService.getPendingSellingOrdersCount("seller_order_test");
+
+        Order order = new Order();
+        order.setOrderNumber("ORD-PENDING-COUNT-" + System.currentTimeMillis());
+        order.setProduct(product);
+        order.setBuyer(buyer);
+        order.setSeller(seller);
+        order.setPriceSnapshot(product.getPrice());
+        order.setStatus(OrderStatus.PENDING_SELLER);
+        orderRepository.saveAndFlush(order);
+
+        assertEquals(initialCount + 1, orderService.getPendingSellingOrdersCount("seller_order_test"));
+
+        mockMvc.perform(get("/api/v1/orders/selling/pending-count"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingCount").value(initialCount + 1));
+    }
 }

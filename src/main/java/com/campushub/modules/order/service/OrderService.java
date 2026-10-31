@@ -369,6 +369,13 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public long getPendingSellingOrdersCount(String sellerUsername) {
+        User seller = userRepository.findByUsername(sellerUsername)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return orderRepository.countBySellerIdAndStatus(seller.getId(), OrderStatus.PENDING_SELLER);
+    }
+
+    @Transactional(readOnly = true)
     public OrderDetailResponse getOrder(Long id, String username) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));

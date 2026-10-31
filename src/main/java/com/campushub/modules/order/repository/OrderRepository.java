@@ -34,6 +34,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Page<Order> findBySellerId(Long sellerId, Pageable pageable);
 
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.seller.id = :sellerId AND o.status = :status")
+    long countBySellerIdAndStatus(@Param("sellerId") Long sellerId, @Param("status") OrderStatus status);
+
     @Query("SELECT COUNT(o) > 0 FROM Order o WHERE o.product.id = :productId AND o.status IN :statuses")
     boolean existsByProductIdAndStatusIn(@Param("productId") Long productId, @Param("statuses") Collection<OrderStatus> statuses);
 

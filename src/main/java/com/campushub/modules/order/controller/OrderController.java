@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -53,6 +54,13 @@ public class OrderController {
         if (size > 50) size = 50;
         Pageable pageable = com.campushub.common.model.PageRequests.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ResponseEntity.ok(orderService.getSellingOrders(authentication.getName(), pageable));
+    }
+
+    @GetMapping("/selling/pending-count")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Long>> getPendingSellingOrdersCount(Authentication authentication) {
+        long count = orderService.getPendingSellingOrdersCount(authentication.getName());
+        return ResponseEntity.ok(Map.of("pendingCount", count));
     }
 
     @GetMapping("/{id}")
