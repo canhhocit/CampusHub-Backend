@@ -10,6 +10,8 @@ public class LockerResponse implements Serializable {
     private String name;
     private String location;
     private LockerStatus status;
+    private Double latitude;
+    private Double longitude;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private long totalCompartments;
@@ -94,5 +96,21 @@ public class LockerResponse implements Serializable {
 
     public void setOccupiedCompartments(long occupiedCompartments) {
         this.occupiedCompartments = occupiedCompartments;
+    }
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
     }
 }

@@ -51,6 +51,8 @@ public class LockerService {
         res.setName(locker.getName());
         res.setLocation(locker.getLocation());
         res.setStatus(locker.getStatus());
+        res.setLatitude(locker.getLatitude());
+        res.setLongitude(locker.getLongitude());
         res.setCreatedAt(locker.getCreatedAt());
         res.setUpdatedAt(locker.getUpdatedAt());
 
@@ -100,6 +102,8 @@ public class LockerService {
         res.setName(locker.getName());
         res.setLocation(locker.getLocation());
         res.setStatus(locker.getStatus());
+        res.setLatitude(locker.getLatitude());
+        res.setLongitude(locker.getLongitude());
         res.setCreatedAt(locker.getCreatedAt());
         res.setUpdatedAt(locker.getUpdatedAt());
         res.setCompartmentSummary(summary);
@@ -119,6 +123,8 @@ public class LockerService {
         locker.setCode(code);
         locker.setName(request.getName().trim());
         locker.setLocation(request.getLocation().trim());
+        locker.setLatitude(request.getLatitude());
+        locker.setLongitude(request.getLongitude());
         locker.setStatus(LockerStatus.ACTIVE);
 
         locker = lockerRepository.save(locker);
@@ -133,6 +139,12 @@ public class LockerService {
 
         locker.setName(request.getName().trim());
         locker.setLocation(request.getLocation().trim());
+        if (request.getLatitude() != null) {
+            locker.setLatitude(request.getLatitude());
+        }
+        if (request.getLongitude() != null) {
+            locker.setLongitude(request.getLongitude());
+        }
 
         locker = lockerRepository.save(locker);
         return mapLocker(locker);

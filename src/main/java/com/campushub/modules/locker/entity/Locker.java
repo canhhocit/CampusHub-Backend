@@ -22,6 +22,12 @@ public class Locker extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private LockerStatus status = LockerStatus.ACTIVE;
 
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     @OneToMany(mappedBy = "locker", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Compartment> compartments = new ArrayList<>();
 
@@ -55,6 +61,22 @@ public class Locker extends BaseEntity {
 
     public void setStatus(LockerStatus status) {
         this.status = status;
+    }
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
     }
 
     public List<Compartment> getCompartments() {

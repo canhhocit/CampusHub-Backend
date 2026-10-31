@@ -91,6 +91,8 @@ public class LockerIntegrationTest {
         req.setCode("LK-TEST-1");
         req.setName("Test Locker 1");
         req.setLocation("Engineering Hall Floor 1");
+        req.setLatitude(21.0049);
+        req.setLongitude(105.8458);
 
         mockMvc.perform(post("/api/v1/lockers").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -98,6 +100,8 @@ public class LockerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value("LK-TEST-1"))
                 .andExpect(jsonPath("$.name").value("Test Locker 1"))
+                .andExpect(jsonPath("$.latitude").value(21.0049))
+                .andExpect(jsonPath("$.longitude").value(105.8458))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 
