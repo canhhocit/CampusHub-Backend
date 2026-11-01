@@ -1,5 +1,6 @@
 package com.campushub.modules.auth;
 
+import com.campushub.modules.auth.dto.ChangePasswordRequest;
 import com.campushub.modules.auth.dto.LoginRequest;
 import com.campushub.modules.auth.dto.RegisterRequest;
 import com.campushub.modules.auth.entity.VerificationToken;
@@ -81,9 +82,7 @@ public class AuthIntegrationTest {
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isForbidden()); // USER_PENDING
 
-        // 3. Verify Email (Wait, we can't easily get the raw token because it's hashed in DB)
-        // Since it's hashed in DB, we can't test the actual verify endpoint without the raw token.
-        // I will manually activate the user in DB for the rest of the flow.
+        // 3. Verify Email
         userRepository.findByUsername("testuser").ifPresent(user -> {
             user.setStatus(com.campushub.common.enums.UserStatus.ACTIVE);
             userRepository.save(user);
@@ -144,5 +143,82 @@ public class AuthIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(registerReq)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testChangePasswordFlow() throws Exception {
+        // Setup active user
+        com.campushub.modules.user.entity.User user = new com.campushub.modules.user.entity.User();
+        user.setUsername("changepass_user");
+        user.setEmail("changepass@campushub.vn");
+        user.setPasswordHash(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("oldPassword123"));
+        user.setFullName("Change Pass User");
+        user.setRole(com.campushub.common.enums.Role.USER);
+        user.setStatus(com.campushub.common.enums.UserStatus.ACTIVE);
+        user = userRepository.save(user);
+
+        // Login to get access token
+        LoginRequest loginReq = new LoginRequest();
+        loginReq.setUsernameOrEmail("changepass_user");
+        loginReq.setPassword("oldPassword123");
+
+        MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String token = objectMapper.readTree(loginResult.getResponse().getContentAsString()).get("accessToken").asText();
+
+        // 1. Unauthenticated fails
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        req.setCurrentPassword("oldPassword123");
+        req.setNewPassword("newPassword456");
+
+        mockMvc.perform(post("/api/v1/auth/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isUnauthorized());
+
+        // 2. Wrong current password fails with 400
+        req.setCurrentPassword("wrongPassword123");
+        mockMvc.perform(post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mật khẩu hiện tại không chính xác"));
+
+        // 3. New password same as old fails with 400
+        req.setCurrentPassword("oldPassword123");
+        req.setNewPassword("oldPassword123");
+        mockMvc.perform(post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mật khẩu mới không được trùng với mật khẩu hiện tại"));
+
+        // 4. Successful password change
+        req.setNewPassword("newPassword456");
+        mockMvc.perform(post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk());
+
+        // 5. Old password login now fails
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isUnauthorized());
+
+        // 6. New password login succeeds
+        loginReq.setPassword("newPassword456");
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").exists());
     }
 }

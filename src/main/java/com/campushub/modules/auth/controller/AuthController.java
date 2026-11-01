@@ -80,6 +80,15 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Change password", description = "Change password for currently authenticated user")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request,
+                                               Authentication authentication) {
+        authService.changePassword(request, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get current user", description = "Get basic info of currently authenticated user")

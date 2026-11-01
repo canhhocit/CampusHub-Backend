@@ -8,6 +8,8 @@ public enum ErrorCode {
     USER_PENDING(HttpStatus.FORBIDDEN, "Account is pending verification"),
     USER_LOCKED(HttpStatus.FORBIDDEN, "Account is locked"),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid username or password"),
+    CURRENT_PASSWORD_INCORRECT(HttpStatus.BAD_REQUEST, "Mật khẩu hiện tại không chính xác"),
+    NEW_PASSWORD_SAME_AS_OLD(HttpStatus.BAD_REQUEST, "Mật khẩu mới không được trùng với mật khẩu hiện tại"),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "Invalid or expired token"),
     TOKEN_REUSE_DETECTED(HttpStatus.UNAUTHORIZED, "Token reuse detected. All sessions revoked."),
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Please try again later."),

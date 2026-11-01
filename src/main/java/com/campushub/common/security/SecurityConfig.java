@@ -51,7 +51,7 @@ public class SecurityConfig {
                 })
             )
             .authorizeHttpRequests(auth -> 
-                auth.requestMatchers("/api/v1/auth/me").authenticated()
+                auth.requestMatchers("/api/v1/auth/me", "/api/v1/auth/change-password").authenticated()
                     .requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers("/api/v1/ping", "/api/v1/health", "/ping", "/health").permitAll()
                     .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()

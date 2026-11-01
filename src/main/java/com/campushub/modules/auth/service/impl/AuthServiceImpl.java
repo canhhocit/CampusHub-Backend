@@ -347,6 +347,26 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.revokeAllUserTokens(user);
     }
 
+    @Override
+    @Transactional
+    public void changePassword(ChangePasswordRequest request, String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new AppException(ErrorCode.CURRENT_PASSWORD_INCORRECT);
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+            throw new AppException(ErrorCode.NEW_PASSWORD_SAME_AS_OLD);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        refreshTokenRepository.revokeAllUserTokens(user);
+    }
+
     private VerificationToken lockVerificationToken(String hash, TokenType type) {
         VerificationToken candidate = verificationTokenRepository.findByTokenHashAndType(hash, type)
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));

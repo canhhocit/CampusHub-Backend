@@ -12,4 +12,5 @@ public interface AuthService {
     void logout(HttpServletRequest httpRequest, HttpServletResponse httpResponse);
     void forgotPassword(ForgotPasswordRequest request, HttpServletRequest httpRequest);
     void resetPassword(ResetPasswordRequest request);
+    void changePassword(ChangePasswordRequest request, String username);
 }
