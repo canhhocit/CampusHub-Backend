@@ -716,9 +716,23 @@ public class OrderService {
             throw new AppException(ErrorCode.INVALID_ORDER_STATUS);
         }
 
-        Locker locker = lockLocker(request.getLockerId());
+        // Validate return locker: Must return to the original locker station where the item was deposited
+        Long targetLockerId;
+        if (order.getLocker() != null) {
+            if (request != null && request.getLockerId() != null && !request.getLockerId().equals(order.getLocker().getId())) {
+                throw new AppException(ErrorCode.INVALID_LOCKER_FOR_RETURN);
+            }
+            targetLockerId = order.getLocker().getId();
+        } else {
+            if (request == null || request.getLockerId() == null) {
+                throw new AppException(ErrorCode.LOCKER_NOT_FOUND);
+            }
+            targetLockerId = request.getLockerId();
+        }
+
+        Locker locker = lockLocker(targetLockerId);
         Compartment returnCompartment;
-        if (request.getCompartmentId() != null) {
+        if (request != null && request.getCompartmentId() != null) {
             returnCompartment = compartmentRepository.findByIdWithLock(request.getCompartmentId())
                     .orElseThrow(() -> new AppException(ErrorCode.COMPARTMENT_NOT_FOUND));
             entityManager.refresh(returnCompartment, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);

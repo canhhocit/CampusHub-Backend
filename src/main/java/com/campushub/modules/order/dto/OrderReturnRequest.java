@@ -1,10 +1,7 @@
 package com.campushub.modules.order.dto;
 
-import jakarta.validation.constraints.NotNull;
-
 public class OrderReturnRequest {
 
-    @NotNull(message = "Locker ID is required")
     private Long lockerId;
 
     private Long compartmentId;

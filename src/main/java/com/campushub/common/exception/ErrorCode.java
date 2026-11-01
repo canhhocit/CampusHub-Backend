@@ -29,6 +29,7 @@ public enum ErrorCode {
     ACTIVE_ORDER_EXISTS(HttpStatus.CONFLICT, "An active order already exists for this product"),
     INVALID_ORDER_STATUS(HttpStatus.BAD_REQUEST, "Invalid order status transition"),
     NO_AVAILABLE_COMPARTMENT(HttpStatus.BAD_REQUEST, "No available compartment in the selected locker"),
+    INVALID_LOCKER_FOR_RETURN(HttpStatus.BAD_REQUEST, "Đồ thuê phải được hoàn trả về đúng trạm tủ ban đầu"),
     INVALID_PICKUP_CODE(HttpStatus.BAD_REQUEST, "Invalid pickup code"),
     PICKUP_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "Pickup code has expired"),
     PICKUP_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Exceeded maximum pickup attempts. Please contact support."),

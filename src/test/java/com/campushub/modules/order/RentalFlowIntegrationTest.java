@@ -254,7 +254,24 @@ public class RentalFlowIntegrationTest {
         Product prodRented = productRepository.findById(rentalProduct.getId()).orElseThrow();
         assertEquals(ProductStatus.RENTED, prodRented.getStatus());
 
-        // 5. Buyer initiates return into the other compartment
+        // 4b. Verify early return requires the original locker station (rejects different locker)
+        Locker otherLocker = new Locker();
+        otherLocker.setCode("LK-OTHER-" + System.nanoTime());
+        otherLocker.setName("Other Campus Locker");
+        otherLocker.setLocation("Dorm B");
+        otherLocker.setStatus(LockerStatus.ACTIVE);
+        otherLocker = lockerRepository.save(otherLocker);
+
+        OrderReturnRequest invalidLockerReq = new OrderReturnRequest();
+        invalidLockerReq.setLockerId(otherLocker.getId());
+        mockMvc.perform(post("/api/v1/orders/" + orderId + "/initiate-return")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidLockerReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Đồ thuê phải được hoàn trả về đúng trạm tủ ban đầu"));
+
+        // 5. Buyer initiates return early into another compartment at the original locker station
         Long returnCompartmentId = assignedCompartmentId.equals(compartment1.getId()) ? compartment2.getId() : compartment1.getId();
         OrderReturnRequest returnReq = new OrderReturnRequest();
         returnReq.setLockerId(locker.getId());

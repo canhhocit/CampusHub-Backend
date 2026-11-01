@@ -118,8 +118,11 @@ public class OrderController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<OrderResponse> initiateReturn(
             @PathVariable Long id,
-            @Valid @RequestBody OrderReturnRequest request,
+            @RequestBody(required = false) OrderReturnRequest request,
             Authentication authentication) {
+        if (request == null) {
+            request = new OrderReturnRequest();
+        }
         return ResponseEntity.ok(orderService.initiateReturn(id, request, authentication.getName()));
     }
 
